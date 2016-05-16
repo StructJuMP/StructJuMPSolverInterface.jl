@@ -1,8 +1,18 @@
-module ParPipsInterface
+try
+    include(get(ENV,"PIPS_NLP_PAR_JULIA_INTERFACE",""))
+catch err
+    if(isa(err, ErrorException))
+      warn("Could not include PIPS-NLP Julia interface file. Please setup ENV variable 'PIPS_NLP_PAR_JULIA_INTERFACE' to the location of this file, usually in PIPS repo at PIPS-NLP/JuliaInterface/ParPipsNlp.jl")
+    end
+    rethrow()
+end
 
-using ParPipsNlp
+module ParPipsNlpInterface
+
 using StructJuMP, JuMP
 using MPI
+using SolverInterface
+using ParPipsNlp
 
 import MathProgBase
 
@@ -498,7 +508,6 @@ end
 
 function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     # @show "solve"
-    # global m = model
     t_total = 0.0
     tic()
     MPI.Init()
@@ -506,12 +515,12 @@ function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     comm = MPI.COMM_WORLD
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
-    prob = createProblemStruct(comm, StructJuMPModel(model,0))
+    prob = ParPipsNlp.createProblemStruct(comm, StructJuMPModel(model,0))
     # @show "end createStructJuMPPipsNlpProblem"
 
     solver_total = 0.0
     tic()
-    status = solveProblemStruct(prob)
+    status = ParPipsNlp.solveProblemStruct(prob)
     solver_total += toq()
 
     freeProblemStruct(prob)

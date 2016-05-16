@@ -1,6 +1,18 @@
+
+try
+    include(get(ENV,"PIPS_NLP_JULIA_INTERFACE",""))
+    # @show get(ENV,"PIPS_NLP_JULIA_INTERFACE","")
+catch err
+    if(isa(err, ErrorException))
+      warn("Could not include PIPS-NLP Julia interface file. Please setup ENV variable 'PIPS_NLP_JULIA_INTERFACE' to the location of this file, usually in PIPS repo at PIPS-NLP/JuliaInterface/ParPipsNlp.jl")
+    end
+    rethrow()
+end
+
 module SerialPipsNlpInterface
 
 using StructJuMP, JuMP
+using SolverInterface
 using PipsNlp
 
 import MathProgBase
@@ -201,6 +213,7 @@ type NonStructJuMPModel
             m = instance.model
             if mode == :Structure
                 mat = sparse(instance.hess_J,instance.hess_I,ones(Float64,length(instance.hess_I)))
+                # @show mat
                 @assert length(mat.nzval) == instance.nzh
                 array_copy(mat.rowval,1,rows,1,length(mat.rowval))
                 array_copy(mat.colptr,1,cols,1,length(mat.colptr))
@@ -284,22 +297,29 @@ type NonStructJuMPModel
                 jj = i_hess_J[idx]
 
                 if haskey(reverse_map,ii)
-                    push!(instance.hess_I, reverse_map[ii])
+                    new_ii = reverse_map[ii]
                 else
-                    push!(instance.hess_I, ii + offset)
+                    new_ii = ii + offset
                 end
 
                 if haskey(reverse_map,jj)
-                    push!(instance.hess_J, reverse_map[jj])
+                    new_jj = reverse_map[jj]
                 else
-                    push!(instance.hess_J, jj + offset)
+                    new_jj = jj + offset
+                end
+
+                if(new_ii>new_jj)
+                    push!(instance.hess_I,new_ii)
+                    push!(instance.hess_J,new_jj)
+                else
+                    push!(instance.hess_I,new_jj)
+                    push!(instance.hess_J,new_ii)
                 end
             end
             push!(instance.nz_hess, length(i_hess_I)) #offset by 1
 
             offset += get_numvars(m,i)
         end
-
         return instance  
     end
 end

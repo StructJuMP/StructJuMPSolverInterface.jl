@@ -1,10 +1,20 @@
 #helper.jl
+using StructJuMP, JuMP
+import MathProgBase
 
-export  get_model,  get_numcons,  get_numvars, get_var_value, get_nlp_evaluator, 
-        array_copy, write_mat_to_file, convert_to_c_idx, g_numvars, g_numcons
+export  get_model,  get_numcons,  get_numvars, get_var_value, get_nlp_evaluator, convert_to_lower,
+        array_copy, write_mat_to_file, convert_to_c_idx, g_numvars, g_numcons, getVarValue
 
 function get_model(m,id)
     return id==0?m:getchildren(m)[id]
+end
+
+function getVarValue(m)
+    ids = getScenarioIds(m)
+    for i in ids
+        @printf "At node : %d\n" i
+        @printf "\t %s \n" get_var_value(m,i)
+    end
 end
 
 function get_numvars(m,id)
@@ -80,6 +90,19 @@ function g_numvars(m)
     return nvar
 end
 
+function convert_to_lower(I,J,rI,rJ)
+    @assert length(I) == length(J) == length(rI) == length(rJ)
+    for i in 1:length(I)
+        if I[i] < J[i]
+            rI = I[i]
+            rJ = J[i]
+        else
+            rI = J[i]
+            rJ = I[i]
+        end
+    end
+    return rI, rJ
+end
 
 function SparseMatrix.sparse(I,J,V, M, N;keepzeros=false)
     if(!keepzeros)
