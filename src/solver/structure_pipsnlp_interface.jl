@@ -1,18 +1,18 @@
-try
-    include(get(ENV,"PIPS_NLP_PAR_JULIA_INTERFACE",""))
-catch err
-    if(isa(err, ErrorException))
-      warn("Could not include PIPS-NLP Julia interface file. Please setup ENV variable 'PIPS_NLP_PAR_JULIA_INTERFACE' to the location of this file, usually in PIPS repo at PIPS-NLP/JuliaInterface/ParPipsNlp.jl")
-    end
-    rethrow()
-end
+# try
+#     include(get(ENV,"PIPS_NLP_PAR_JULIA_INTERFACE",""))
+# catch err
+#     if(isa(err, ErrorException))
+#       warn("Could not include PIPS-NLP Julia interface file. Please setup ENV variable 'PIPS_NLP_PAR_JULIA_INTERFACE' to the location of this file, usually in PIPS repo at PIPS-NLP/JuliaInterface/ParPipsNlp.jl")
+#     end
+#     rethrow()
+# end
 
 module ParPipsNlpInterface
 
 using StructJuMP, JuMP
 using MPI
 using SolverInterface
-using ParPipsNlp
+using PIPS_NLP, ParPipsNlp
 
 import MathProgBase
 
