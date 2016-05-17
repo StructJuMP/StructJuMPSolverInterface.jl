@@ -11,7 +11,7 @@ module ParPipsNlpInterface
 
 using StructJuMP, JuMP
 using MPI
-using SolverInterface
+using StructJuMPSolverInterface
 using PIPS_NLP, ParPipsNlp
 
 import MathProgBase

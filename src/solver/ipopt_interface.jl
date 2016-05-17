@@ -1,6 +1,6 @@
 module SerialIpoptInterface
 
-using StructJuMP, JuMP, SolverInterface
+using StructJuMP, JuMP, StructJuMPSolverInterface
 using Ipopt
 
 import MathProgBase
