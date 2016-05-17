@@ -1,5 +1,5 @@
 
-module SolverInterface
+module StructJuMPSolverInterface
 
 
 # Struct Model interface
