@@ -8,7 +8,7 @@ function init_constraints_idx_map(m,map)
         eq_idx = Dict{Int,Int}()
         ieq_idx = Dict{Int,Int}()
         push!(map,id=>Pair(eq_idx,ieq_idx))
-        lb,ub=getConstraintBounds(get_model(m,id))
+        lb,ub=JuMP.constraintbounds(get_model(m,id))
 
         for i =1:length(lb)
             if lb[i] == ub[i]

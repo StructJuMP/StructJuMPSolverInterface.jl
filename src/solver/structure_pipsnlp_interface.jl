@@ -69,7 +69,7 @@ type StructJuMPModel <: ModelInterface
             return num_scenarios(instance.internalModel)
         end
         instance.get_sense = function()
-            return getObjectiveSense(instance.internalModel)
+            return getobjectivesense(instance.internalModel)
         end
         instance.get_status = function()
             return instance.status
@@ -103,7 +103,7 @@ type StructJuMPModel <: ModelInterface
             @assert length(x0) == nvar
             
             for i=1:nvar
-                x0[i] = getValue(Variable(mm,i))
+                x0[i] = getvalue(Variable(mm,i))
                 isnan(x0[i])?x0[i]=1.0:nothing
             end
             # @show x0;
@@ -127,7 +127,7 @@ type StructJuMPModel <: ModelInterface
                 @assert length(cub) == nvar
                 array_copy(mm.colUpper, 1, cub, 1, nvar)
                 array_copy(mm.colLower, 1, clb, 1, nvar)
-                lb,ub = getConstraintBounds(mm)
+                lb,ub = JuMP.constraintbounds(mm)
                 # @show lb, ub
                 (eq_idx, ieq_idx) = instance.id_con_idx_map[id]
                 # @show eq_idx,ieq_idx
@@ -475,7 +475,7 @@ type StructJuMPModel <: ModelInterface
             #write back the primal to JuMP
             mm = get_model(instance.internalModel,id)
             for i = 1:length(x)
-                setValue(Variable(mm,i), x[i])
+                setvalue(Variable(mm,i), x[i])
             end
 
 

@@ -32,7 +32,7 @@ function get_var_value(m,id)
     mm = get_model(m,id)
     v = Float64[];
     for i = 1:get_numvars(m,id)
-        v = [v;JuMP.getValue(JuMP.Variable(mm,i))]
+        v = [v;JuMP.getvalue(JuMP.Variable(mm,i))]
     end
     return v
 end
@@ -41,7 +41,7 @@ function get_nlp_evaluator(m,id)
     # @show id,getScenarioIds(m)
     # @show getProcIdxSet(m)
     # assert(id == 0 || id in getProcIdxSet(m))
-    e = JuMP.JuMPNLPEvaluator(get_model(m,id))
+    e = JuMP.NLPEvaluator(get_model(m,id))
     MathProgBase.initialize(e,[:Grad,:Jac,:Hess])
     return e
 end

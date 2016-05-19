@@ -40,7 +40,7 @@ type NonStructJuMPModel
             for i = 0:num_scenarios(m)
                 mm = get_model(m,i)
                 for j = 1:get_numvars(m,i)
-                    setValue(Variable(mm,j),x[idx])
+                    setvalue(Variable(mm,j),x[idx])
                     idx += 1
                 end
             end
@@ -53,7 +53,7 @@ type NonStructJuMPModel
             for i = 0:num_scenarios(m)
                 mm = get_model(m,i)
                 for j = 1:get_numvars(m,i)
-                    v_j = getValue(Variable(mm,j))
+                    v_j = getvalue(Variable(mm,j))
                     x[idx] = isnan(v_j)? 1.0:v_j
                     idx += 1
                 end
@@ -96,7 +96,7 @@ type NonStructJuMPModel
                 array_copy(mm.colUpper, 1, x_U, col_start, nx)
                 array_copy(mm.colLower, 1, x_L, col_start, nx)
 
-                lb,ub = getConstraintBounds(mm)
+                lb,ub = JuMP.constraintbounds(mm)
                 ncons = get_numcons(m,i)
                 array_copy(lb,1,g_L,row_start,ncons)
                 array_copy(ub,1,g_U,row_start,ncons)
