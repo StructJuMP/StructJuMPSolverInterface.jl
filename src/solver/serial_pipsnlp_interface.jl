@@ -27,6 +27,7 @@ type NonStructJuMPModel
     nz_hess::Vector{Int}
     nzj::Int
     nzh::Int
+    g_iter::Int
 
     write_solution::Function
     get_x0::Function
@@ -44,7 +45,7 @@ type NonStructJuMPModel
     function NonStructJuMPModel(model)
         instance = new(model, 
             Vector{Int}(), Vector{Int}(), Vector{Int}(), Vector{Int}(),
-            Vector{Int}(), Vector{Int}(), 0 , 0
+            Vector{Int}(), Vector{Int}(), 0 , 0, 0
             )
         
         instance.write_solution = function(x)
@@ -122,6 +123,7 @@ type NonStructJuMPModel
                 row_start += get_numcons(m,i)
                 col_start += get_numvars(m,i)
             end
+            # @show g_L, g_U
             return x_L, x_U, g_L, g_U
         end
         
@@ -152,6 +154,7 @@ type NonStructJuMPModel
                 g_start_idx += ncon
                 start_idx += get_numvars(m,i)
             end
+            # @show "+++++++++++++ eval_g", x , g
         end
 
         instance.eval_grad_f = function(x,grad_f)
@@ -177,9 +180,11 @@ type NonStructJuMPModel
                 end
                 start_idx += nx
             end
+            # @show "+++++++++++ eval_grad_f" x, grad_f
         end
 
         instance.eval_jac_g = function(x,mode,rows,cols,nzvals) #x, mode, irows, kcols, values)
+            # @show "+++++++++++ eval_jac_g", mode, x
             m = instance.model
             if mode==:Structure
                 mat = sparse(instance.jac_I,instance.jac_J,ones(Float64,length(instance.jac_I)))
@@ -204,12 +209,20 @@ type NonStructJuMPModel
                 @assert length(instance.jac_I) == length(instance.jac_J) == length(value)
                 mat = sparse(instance.jac_I,instance.jac_J,value, g_numcons(instance.model), g_numvars(instance.model), keepzeros=true)
                 
+                jac_I = instance.jac_I
+                jac_J = instance.jac_J
+                # @printf( "m=%d; n=%d; \n", g_numcons(instance.model), g_numvars(instance.model))
+                # @show jac_I, jac_J, value
+
                 @assert length(mat.nzval) == instance.nzj
                 array_copy(mat.nzval,1,nzvals,1,instance.nzj)
             end
         end
 
         instance.eval_h = function(x, mode, rows, cols, obj_factor, lambda, nzvals) #x, mode, irows, kcols, obj_factor, lambda, values)
+            # @show "+++++++++++ eval_h ", mode, obj_factor
+            # @show x
+            # @show lambda
             m = instance.model
             if mode == :Structure
                 mat = sparse(instance.hess_J,instance.hess_I,ones(Float64,length(instance.hess_I)))
@@ -247,6 +260,14 @@ type NonStructJuMPModel
                 mat = sparse(instance.hess_J,instance.hess_I,value,  g_numvars(instance.model), g_numvars(instance.model), keepzeros=true)
                 @assert length(mat.nzval) == instance.nzh
                 array_copy(mat.nzval,1,nzvals,1,instance.nzh)
+
+                # hess_I = instance.hess_J
+                # hess_J = instance.hess_I
+                # @printf( "m=%d n=%d \n", g_numvars(instance.model), g_numvars(instance.model))
+                # @show hess_I, hess_J, value
+
+                # write_x("pips",instance.g_iter,x)
+                instance.g_iter += 1
                 # @show nzvals
             end
         end

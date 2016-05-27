@@ -4,7 +4,13 @@ import MathProgBase
 
 export  get_model,  get_numcons,  get_numvars, get_var_value, get_nlp_evaluator, convert_to_lower,
         array_copy, write_mat_to_file, convert_to_c_idx, g_numvars, g_numcons, getVarValue,
-        getScenarioIds, getVarValue
+        getScenarioIds, getVarValue, write_x
+
+function write_x(subdir,iter,x)
+    @printf("writing x to ./%s/x%d \n",subdir,iter)
+    run(`mkdir -p ./$subdir`)
+    writedlm(string("./",subdir,"/x",iter),x,",")
+end
 
 
 function getScenarioIds(m::JuMP.Model)
