@@ -1,14 +1,4 @@
 
-# try
-#     include(get(ENV,"PIPS_NLP_JULIA_INTERFACE",""))
-#     # @show get(ENV,"PIPS_NLP_JULIA_INTERFACE","")
-# catch err
-#     if(isa(err, ErrorException))
-#       warn("Could not include PIPS-NLP Julia interface file. Please setup ENV variable 'PIPS_NLP_JULIA_INTERFACE' to the location of this file, usually in PIPS repo at PIPS-NLP/JuliaInterface/ParPipsNlp.jl")
-#     end
-#     rethrow()
-# end
-
 module SerialPipsNlpInterface
 
 using StructJuMP, JuMP
@@ -129,14 +119,17 @@ type NonStructJuMPModel
         
         instance.eval_f = function(x)
             m = instance.model
-            objv = 0.0
+            obj = 0.0
             start_idx = 1
             for i=0:num_scenarios(m)
                 x_new = strip_x(m,i,x,start_idx)    
-                objv += MathProgBase.eval_f(get_nlp_evaluator(m,i),x_new)
+                obj += MathProgBase.eval_f(get_nlp_evaluator(m,i),x_new)
                 start_idx += get_numvars(m,i)
             end
-            return objv;
+            # @printf("++++++++++++++++ eval_f  \n")
+            # @show obj
+            # @show x
+            return obj;
         end 
 
         instance.eval_g = function(x,g)
@@ -154,7 +147,8 @@ type NonStructJuMPModel
                 g_start_idx += ncon
                 start_idx += get_numvars(m,i)
             end
-            # @show "+++++++++++++ eval_g", x , g
+            # @printf("+++++++++++++ eval_g \n")
+            # @show x , g
         end
 
         instance.eval_grad_f = function(x,grad_f)
@@ -180,11 +174,12 @@ type NonStructJuMPModel
                 end
                 start_idx += nx
             end
-            # @show "+++++++++++ eval_grad_f" x, grad_f
+            # @printf("+++++++++++ eval_grad_f \n")
+            # @show  x, grad_f
         end
 
         instance.eval_jac_g = function(x,mode,rows,cols,nzvals) #x, mode, irows, kcols, values)
-            # @show "+++++++++++ eval_jac_g", mode, x
+            # @printf("+++++++++++ eval_jac_g %s \n", mode) 
             m = instance.model
             if mode==:Structure
                 mat = sparse(instance.jac_I,instance.jac_J,ones(Float64,length(instance.jac_I)))
@@ -213,6 +208,7 @@ type NonStructJuMPModel
                 jac_J = instance.jac_J
                 # @printf( "m=%d; n=%d; \n", g_numcons(instance.model), g_numvars(instance.model))
                 # @show jac_I, jac_J, value
+                # @printf( "sjac=sparse(jac_I,jac_J,value,m,n); \n")
 
                 @assert length(mat.nzval) == instance.nzj
                 array_copy(mat.nzval,1,nzvals,1,instance.nzj)
@@ -220,7 +216,7 @@ type NonStructJuMPModel
         end
 
         instance.eval_h = function(x, mode, rows, cols, obj_factor, lambda, nzvals) #x, mode, irows, kcols, obj_factor, lambda, values)
-            # @show "+++++++++++ eval_h ", mode, obj_factor
+            # @printf("+++++++++++ eval_h - %s, %f \n", mode, obj_factor)
             # @show x
             # @show lambda
             m = instance.model
@@ -261,10 +257,11 @@ type NonStructJuMPModel
                 @assert length(mat.nzval) == instance.nzh
                 array_copy(mat.nzval,1,nzvals,1,instance.nzh)
 
-                # hess_I = instance.hess_J
-                # hess_J = instance.hess_I
-                # @printf( "m=%d n=%d \n", g_numvars(instance.model), g_numvars(instance.model))
+                hess_I = instance.hess_J
+                hess_J = instance.hess_I
+                # @printf("m=%d; n=%d; \n", g_numvars(instance.model), g_numvars(instance.model))
                 # @show hess_I, hess_J, value
+                # @printf("shess=sparse(hess_I,hess_J,value,m,n); \n")
 
                 # write_x("pips",instance.g_iter,x)
                 instance.g_iter += 1
@@ -365,7 +362,11 @@ function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     nm.get_x0(prob.x)
     status = solveProblem(prob)
     nm.write_solution(prob.x)
+    # freeProblem(prob)
+    
     return status
 end
+
+KnownSolvers["Pips"] = SerialPipsNlpInterface.structJuMPSolve
 
 end

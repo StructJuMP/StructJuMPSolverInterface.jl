@@ -305,4 +305,6 @@ function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     return status
 end
 
-end
+KnownSolvers["Ipopt"] = SerialIpoptInterface.structJuMPSolve
+
+end  #end module

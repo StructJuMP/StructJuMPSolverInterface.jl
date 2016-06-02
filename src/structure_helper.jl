@@ -5,6 +5,7 @@ export init_constraints_idx_map, build_x, get_jac_col_var_idx, get_h_var_idx
 function init_constraints_idx_map(m,map)
     assert(length(map) == 0)
     for id in getScenarioIds(m)
+        e = get_nlp_evaluator(m,id) #initialize the nlp evaluator
         eq_idx = Dict{Int,Int}()
         ieq_idx = Dict{Int,Int}()
         push!(map,id=>Pair(eq_idx,ieq_idx))

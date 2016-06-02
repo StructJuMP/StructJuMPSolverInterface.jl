@@ -26,23 +26,24 @@ import MathProgBase
 #     writedlm(string("./",subdir,"/x1_",iter),x,",")
 # end
 
-
-
 type StructJuMPModel <: ModelInterface
     internalModel::JuMP.Model
     status::Int
-    g_iter::Int
+    n_iter::Int
     id_con_idx_map::Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}  #eq, ieq, jump->actual used
 
-    t_init_idx::Float64
-    t_init_x0::Float64
-    t_prob_info::Float64
-    t_eval_f::Float64
-    t_eval_g::Float64
-    t_eval_grad_f::Float64
-    t_eval_jac_g::Float64
-    t_eval_h::Float64
-    t_write_solution::Float64
+    # prof::Bool
+    # t_sj_init::Float64
+    # t_sj_init_x0::Float64
+    # t_sj_str_prob_info::Float64
+    
+    # t_sj_eval_f::Float64
+    # t_sj_eval_g::Float64
+    # t_sj_eval_grad_f::Float64
+    # t_sj_eval_jac_g::Float64
+    # t_sj_eval_h::Float64
+    
+    # t_sj_write_solution::Float64
     
     get_num_scen::Function
     get_sense::Function
@@ -71,12 +72,11 @@ type StructJuMPModel <: ModelInterface
 
 
 
-    function StructJuMPModel(model::JuMP.Model, status::Int)
-        instance = new(model,status,-1,
-            Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}(),
-            0,0,0,0,0,0,0,0,0
+    function StructJuMPModel(model::JuMP.Model)
+        instance = new(model,0,-1,
+            Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}()
+            # ,prof,0,0,0,0,0,0,0,0,0
             )
-        tic()
         init_constraints_idx_map(model,instance.id_con_idx_map)
         
         instance.get_num_scen = function()
@@ -110,7 +110,6 @@ type StructJuMPModel <: ModelInterface
 
 
         instance.str_init_x0 = function(id,x0)
-            tic()
             assert(id in getScenarioIds(instance.internalModel))
             mm = get_model(instance.internalModel,id)
             nvar = get_numvars(instance.internalModel,id)
@@ -121,17 +120,14 @@ type StructJuMPModel <: ModelInterface
                 isnan(x0[i])?x0[i]=1.0:nothing
             end
             # @show x0;
-            instance.t_init_x0 += toq() 
         end  
 
         instance.str_prob_info = function(id,mode,clb,cub,rlb,rub)
-            tic()
             # @show id
             if mode == :Structure
                 nn = get_numvars(instance.internalModel,id)
                 mm = get_numcons(instance.internalModel,id)
                 # @show nn,mm
-                instance.t_prob_info += toq()
                 return (nn,mm)
             elseif mode == :Values
                 # @show length(clb),length(cub)
@@ -160,26 +156,24 @@ type StructJuMPModel <: ModelInterface
             else
                 @assert false mode
             end
-            instance.t_prob_info += toq()
         end 
 
 
         instance.str_eval_f = function(id,x0,x1)
-            tic()
-            # x0, x1 = load_x("pips", instance.g_iter)
+            # @printf("#*************** eval_f - %d \n", id)
+            # @show x0, x1
+            # x0, x1 = load_x("pips", instance.n_iter)
 
             e =  get_nlp_evaluator(instance.internalModel,id)
-            instance.t_eval_f += toq()
             obj = MathProgBase.eval_f(e,build_x(instance.internalModel,id,x0,x1))
 
-            # @show "eval_f", id, obj
-            # @show x0, x1
+            # @show obj
             return obj
+
         end
 
         instance.str_eval_g = function(id,x0,x1, new_eq_g, new_inq_g)
-            tic()
-            # x0, x1 = load_x("pips", instance.g_iter)
+            # x0, x1 = load_x("pips", instance.n_iter)
 
             e = get_nlp_evaluator(instance.internalModel,id)
             g = Vector{Float64}(get_numcons(instance.internalModel,id))
@@ -195,14 +189,13 @@ type StructJuMPModel <: ModelInterface
                 @assert !haskey(eq_idx,i[1])
                 new_inq_g[i[2]] = g[i[1]]
             end
-            instance.t_eval_g  += toq()
-            # @show "********  str_eval_g ", id , x0, x1 
+            # @printf("#********  str_eval_g - %d \n", id)
+            # @show x0, x1 
             # @show new_eq_g, new_inq_g
         end
 
         instance.str_eval_grad_f = function(rowid, colid, x0, x1, new_grad_f)
-            tic()
-            # x0, x1 = load_x("pips", instance.g_iter)
+            # x0, x1 = load_x("pips", instance.n_iter)
 
             @assert rowid >= colid
             @assert sum(new_grad_f) == 0.0 
@@ -217,16 +210,15 @@ type StructJuMPModel <: ModelInterface
             for i in var_idx_map
                 new_grad_f[i[2]] = g[i[1]]
             end
-            instance.t_eval_grad_f += toq()
 
-            # @show "**********  str_eval_grad_f", rowid, colid, x0, x1
-            # @show new_grad_f
+            # @printf("#**********  str_eval_grad_f, %d %d \n", rowid, colid)
+            # @show x0, x1, new_grad_f
+            # @printf("grad%d%d=new_grad_f; \n",rowid,colid)
         end
 
         instance.str_eval_jac_g = function(rowid, colid, x0 , x1, mode, e_rowidx, e_colptr, e_values, i_rowidx, i_colptr, i_values)
-            # @show "**********  str_eval_jac_g", mode, rowid, colid, x0, x1
-            tic()
-            # x0, x1 = load_x("pips",instance.g_iter)
+            # @printf("#**********  str_eval_jac_g  - %s -  %d %d \n", mode, rowid, colid);
+            # x0, x1 = load_x("pips",instance.n_iter)
 
             # @show "str_eval_jac_g", rowid, colid, mode
             m = instance.internalModel
@@ -267,7 +259,6 @@ type StructJuMPModel <: ModelInterface
                 # @show ieq_jac_J
                 ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ones(Float64,length(ieq_jac_I)),length(ieq_idx),get_numvars(m,colid))
                 # @show (length(eq_jac.nzval), length(ieq_jac.nzval))
-                instance.t_eval_jac_g += toq() 
                 return (length(eq_jac.nzval), length(ieq_jac.nzval))
             elseif(mode == :Values)
                 e = get_nlp_evaluator(m,rowid)
@@ -306,7 +297,8 @@ type StructJuMPModel <: ModelInterface
                     eq_jac = sparse(eq_jac_I,eq_jac_J,eq_jac_g, length(eq_idx),get_numvars(m,colid), keepzeros=true)
                     # @printf("em=%d; en=%d;\n", length(eq_idx), get_numvars(m,colid))
                     # @show eq_jac_I, eq_jac_J, eq_jac_g
-                    
+                    # @printf("ejac%d%d=sparse(eq_jac_I,eq_jac_J,eq_jac_g,em,en); \n",rowid,colid)
+                
                     array_copy(eq_jac.rowval,1,e_rowidx,1,length(eq_jac.rowval))
                     array_copy(eq_jac.colptr,1,e_colptr,1,length(eq_jac.colptr))
                     array_copy(eq_jac.nzval, 1,e_values,1,length(eq_jac.nzval))
@@ -322,6 +314,8 @@ type StructJuMPModel <: ModelInterface
                     ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g, length(ieq_idx),get_numvars(m,colid), keepzeros=true)
                     # @printf("im=%d; in=%d;\n", length(ieq_idx), get_numvars(m,colid))
                     # @show ieq_jac_I, ieq_jac_J, ieq_jac_g
+                    # @printf("ijac%d%d=sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g,im,in); \n",rowid,colid)
+                    # @printf("jac%d%d=vcat(ejac%d%d,ijac%d%d) \n",rowid,colid,rowid,colid,rowid,colid)
                     
                     array_copy(ieq_jac.rowval,1,i_rowidx,1,length(ieq_jac.rowval))
                     array_copy(ieq_jac.colptr,1,i_colptr,1,length(ieq_jac.colptr))
@@ -336,16 +330,16 @@ type StructJuMPModel <: ModelInterface
             else
                 @assert false mode
             end
-            instance.t_eval_jac_g += toq() 
+
             # @show "end str_eval_jac_g"
         end
 
 
         instance.str_eval_h = function(rowid, colid, x0, x1, obj_factor, lambda, mode, rowidx, colptr, values)
-            tic()
-            # x0, x1 = load_x("pips", instance.g_iter)
+            # @printf("#**********  str_eval_h - %s - %d %d  %f \n", mode, rowid, colid, obj_factor)
+            # @show lambda
+            # x0, x1 = load_x("pips", instance.n_iter)
 
-            # @show "**********  str_eval_h", mode, rowid, colid, obj_factor
             # @show x0, x1
             # @show lambda
             m = instance.internalModel
@@ -373,7 +367,6 @@ type StructJuMPModel <: ModelInterface
                         end
                     end
                     laghess = sparse(new_h_I,new_h_J, ones(Float64,length(new_h_I)))
-                    instance.t_eval_h += toq()
                     return length(laghess.nzval)
                 elseif rowid == 0  && colid != 0 #border corss hessian
                     e = get_nlp_evaluator(m,colid)
@@ -392,8 +385,7 @@ type StructJuMPModel <: ModelInterface
                         end
                     end
                     laghess = sparse(new_h_I,new_h_J, ones(Float64,length(new_h_I)))
-                    instance.t_eval_h += toq()
-
+                    
                     return length(laghess.nzval)
                 else
                     @assert (rowid !=0 && colid == 0)
@@ -452,11 +444,12 @@ type StructJuMPModel <: ModelInterface
                         # @show h0_I,h0_J
                         str_laghess = sparse([new_h_I;h0_I], [new_h_J;h0_J], [new_h;zeros(Float64,length(h0_I))], get_numvars(m,0),get_numvars(m,0), keepzeros=true)
                         
-                        # new_h_I = [new_h_I;h0_I]
-                        # new_h_J = [new_h_J;h0_J]
-                        # new_h = [new_h;zeros(Float64,length(h0_I))]
+                        new_h_I = [new_h_I;h0_I]
+                        new_h_J = [new_h_J;h0_J]
+                        new_h = [new_h;zeros(Float64,length(h0_I))]
                         # @printf("m=%d; n=%d; \n",get_numvars(m,0),get_numvars(m,0))
                         # @show new_h_I, new_h_J, new_h
+                        # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
                         array_copy(str_laghess.rowval,1,rowidx,1,length(str_laghess.rowval))
                         array_copy(str_laghess.colptr,1,colptr,1,length(str_laghess.colptr))
@@ -466,7 +459,8 @@ type StructJuMPModel <: ModelInterface
                         str_laghess = sparse(new_h_I,new_h_J,new_h,get_numvars(m,rowid),get_numvars(m,rowid),keepzeros = true)   
                         
                         # @printf("m=%d;n=%d; \n",get_numvars(m,rowid),get_numvars(m,rowid))
-                        # @show new_h_I, new_h_J, new_h                    
+                        # @show new_h_I, new_h_J, new_h 
+                        # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)                   
                         
                         array_copy(str_laghess.rowval,1,rowidx,1,length(str_laghess.rowval))
                         array_copy(str_laghess.colptr,1,colptr,1,length(str_laghess.colptr))
@@ -502,10 +496,10 @@ type StructJuMPModel <: ModelInterface
                     
                     # @printf("m=%d; n=%d; \n", get_numvars(m,colid), get_numvars(m,rowid))
                     # @show new_h_I, new_h_J, new_h
+                    # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
-                    # write_x0("parpips",instance.g_iter,x0)
-                    # write_x1("parpips",instance.g_iter,x1)
-                    instance.g_iter += 1
+                    # write_x0("parpips",instance.n_iter,x0)
+                    # write_x1("parpips",instance.n_iter,x1)
 
                     array_copy(str_laghess.rowval,1,rowidx,1,length(str_laghess.rowval))
                     array_copy(str_laghess.colptr,1,colptr,1,length(str_laghess.colptr))
@@ -522,11 +516,9 @@ type StructJuMPModel <: ModelInterface
                 @assert false mode
             end 
             # @show "end str_eval_h"
-            instance.t_eval_h += toq()
         end
         
         instance.str_write_solution = function(id, x, y_eq, y_ieq)
-            tic()
             # @show id, x, y_eq, y_ieq
             @assert id in getScenarioIds(instance.internalModel)
             @assert length(x) == instance.get_num_cols(id)
@@ -538,27 +530,24 @@ type StructJuMPModel <: ModelInterface
             for i = 1:length(x)
                 setvalue(Variable(mm,i), x[i])
             end
-
-            instance.t_write_solution += toq()
         end
-        
-        instance.t_init_idx += toq()
+
         return instance
     end
 end
 
-function show_time(m::ModelInterface)
-    t_model_time = m.t_init_idx +
-    m.t_init_x0 +
-    m.t_prob_info +
-    m.t_eval_f +
-    m.t_eval_g+
-    m.t_eval_grad_f+
-    m.t_eval_jac_g+
-    m.t_eval_h +
-    m.t_write_solution;
-    return t_model_time
-end
+# function show_time(m::ModelInterface)
+#     t_model_evaluation = m.t_sj_init +
+#     m.t_sj_init_x0 +
+#     m.t_prob_info +
+#     m.t_eval_f +
+#     m.t_eval_g+
+#     m.t_eval_grad_f+
+#     m.t_eval_jac_g+
+#     m.t_eval_h +
+#     m.t_write_solution;
+#     return t_model_time
+# end
 
 #######
 # Linking with PIPS Julia Structure interface
@@ -566,37 +555,60 @@ end
 
 # setsolverhook(model,structJuMPSolve)
 
-function structJuMPSolve(model; suppress_warmings=false,kwargs...)
+function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs...)
     # @show "solve"
-    t_total = 0.0
-    tic()
+    t_sj_lifetime = 0.0
+    if with_prof
+        tic()
+    end
     MPI.Init()
 
     comm = MPI.COMM_WORLD
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
-    prob = ParPipsNlp.createProblemStruct(comm, StructJuMPModel(model,0))
+    t_sj_model_init = 0.0
+    if with_prof
+        tic()
+    end    
+    prob = ParPipsNlp.createProblemStruct(comm, StructJuMPModel(model), with_prof)
+
+    if with_prof
+        t_sj_model_init += toq()
+    end
+
     # @show "end createStructJuMPPipsNlpProblem"
 
-    solver_total = 0.0
-    tic()
+    t_sj_solver_total = 0.0
+    if with_prof
+        tic()
+    end
     status = ParPipsNlp.solveProblemStruct(prob)
-    solver_total += toq()
+    
+    if with_prof
+        t_sj_solver_total += toq()
+    end
 
     freeProblemStruct(prob)
-    t_total += toq()
-
-
-    modeling_time = show_time(prob.model)
-    solver_time = solver_total - modeling_time
-
-    if(0==MPI.Comm_rank(MPI.COMM_WORLD)) 
-      @printf "Total time %.4f (initialization=%.3f modelling=%.3f solver=%.3f) (in sec)\n" t_total prob.model.t_init_idx modeling_time solver_time
+    
+    if with_prof
+        t_sj_lifetime += toq()
     end
+
+
+    # solver_time = solver_total - modeling_time
+    # if(0==MPI.Comm_rank(MPI.COMM_WORLD)) 
+    #   @printf "Total time %.4f (initialization=%.3f modelling=%.3f solver=%.3f) (in sec)\n" t_total prob.model.t_sj_init modeling_time solver_time
+    # end
+    mid, nprocs = getMyRank()
+    @printf("[%d/%d] [ t_sj_model_init %f t_sj_solver_total %f  t_sj_lifetime %f ] \n", mid, nprocs, t_sj_model_init, t_sj_solver_total, t_sj_lifetime)
+    @printf("[%d/%d] [ t_jl_str_total %f t_jl_eval_total %f  ] \n", mid, nprocs, prob.t_jl_str_total, prob.t_jl_eval_total)
+    
     MPI.Finalize()
 
     return status
 end
+
+KnownSolvers["ParPips"] = ParPipsNlpInterface.structJuMPSolve
 
 end
 
