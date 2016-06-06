@@ -4,7 +4,7 @@ import MathProgBase
 
 export  get_model,  get_numcons,  get_numvars, get_var_value, get_nlp_evaluator, convert_to_lower,
         array_copy, write_mat_to_file, convert_to_c_idx, g_numvars, g_numcons, getVarValue,
-        getScenarioIds, getVarValue, write_x
+        getScenarioIds, getVarValue, write_x, getSubScenId, @pips_second_stage, message
 
 function write_x(subdir,iter,x)
     @printf("writing x to ./%s/x%d \n",subdir,iter)
@@ -12,6 +12,10 @@ function write_x(subdir,iter,x)
     writedlm(string("./",subdir,"/x",iter),x,",")
 end
 
+function message(s)
+    rank, nprocs = getMyRank()
+    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
+end
 
 function getScenarioIds(m::JuMP.Model)
     myrank,mysize = getMyRank()
@@ -20,6 +24,28 @@ function getScenarioIds(m::JuMP.Model)
     s = myrank * d + 1
     e = myrank == (mysize-1)? numScens:s+d-1
     ids = [0;s:e]
+end
+
+function getSubScenId(m::JuMP.Model)
+    myrank,mysize = getMyRank()
+    numScens = num_scenarios(m)
+    d = div(numScens,mysize)
+    s = myrank * d + 1
+    e = myrank == (mysize-1)? numScens:s+d-1
+    ids = collect(s:e)
+end
+
+
+macro pips_second_stage(m,ind,code)
+    show(m)
+    show(ind)
+    show(code)
+    return quote
+        proc_idx_set = getScenarioIds($(esc(m)))
+        for $(esc(ind)) in proc_idx_set
+            $(esc(code))
+        end
+    end
 end
 
 function get_model(m,id)

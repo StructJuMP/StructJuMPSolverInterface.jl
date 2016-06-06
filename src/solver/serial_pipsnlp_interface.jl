@@ -3,7 +3,8 @@ module SerialPipsNlpInterface
 
 using StructJuMP, JuMP
 using StructJuMPSolverInterface
-using PIPS_NLP, PipsNlp
+using PIPS_NLP
+using PipsNlp
 
 import MathProgBase
 

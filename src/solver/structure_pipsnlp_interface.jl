@@ -561,9 +561,9 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     if with_prof
         tic()
     end
-    MPI.Init()
+    # MPI.Init() ＃initialize in model loading
 
-    comm = MPI.COMM_WORLD
+    comm = getStructure(model).comm
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
     t_sj_model_init = 0.0
@@ -599,10 +599,26 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     # if(0==MPI.Comm_rank(MPI.COMM_WORLD)) 
     #   @printf "Total time %.4f (initialization=%.3f modelling=%.3f solver=%.3f) (in sec)\n" t_total prob.model.t_sj_init modeling_time solver_time
     # end
-    mid, nprocs = getMyRank()
-    @printf("[%d/%d] [ t_sj_model_init %f t_sj_solver_total %f  t_sj_lifetime %f ] \n", mid, nprocs, t_sj_model_init, t_sj_solver_total, t_sj_lifetime)
-    @printf("[%d/%d] [ t_jl_str_total %f t_jl_eval_total %f  ] \n", mid, nprocs, prob.t_jl_str_total, prob.t_jl_eval_total)
-    
+    if with_prof
+        mid, nprocs = getMyRank()
+        bname = string(split(ARGS[1],"/")[2],"_",num_scenarios(model))
+        run(`mkdir -p ./out/$bname`)
+        fname = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".jl.txt")
+        # @show bname, fname
+        tfile = open(fname, "w")
+        s1 = @sprintf("[%d/%d] [ t_sj_model_init %f t_sj_solver_total %f  t_sj_lifetime %f ] \n", mid, nprocs, t_sj_model_init, t_sj_solver_total, t_sj_lifetime)
+        s2 = @sprintf("[%d/%d] [ t_jl_str_total %f t_jl_eval_total %f  ] \n", mid, nprocs, prob.t_jl_str_total, prob.t_jl_eval_total)
+        if(mid == 0)
+            @printf("%s",s1)
+            @printf("%s",s2)
+        end
+        @printf(tfile, "%s", s1)
+        @printf(tfile, "%s", s2)
+        close(tfile)
+        n1 = string("./out/",nprocs,".",mid,".c.txt")
+        n2 = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".c.txt")
+        run(`mv $n1 $n2`)
+    end
     MPI.Finalize()
 
     return status
