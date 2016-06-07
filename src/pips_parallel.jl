@@ -76,10 +76,10 @@ type StructJuMPModel <: ModelInterface
             return instance.status
         end
         instance.get_num_rows = function(id::Integer)
-            return get_numcons(instance.internalModel,id)
+            return getNumCons(instance.internalModel,id)
         end
         instance.get_num_cols = function(id::Integer)
-            return get_numvars(instance.internalModel,id)
+            return getNumVars(instance.internalModel,id)
         end
         instance.get_num_eq_cons = function(id::Integer)
             return length(instance.id_con_idx_map[id][1])
@@ -97,9 +97,9 @@ type StructJuMPModel <: ModelInterface
 
 
         instance.str_init_x0 = function(id,x0)
-            assert(id in getScenarioIds(instance.internalModel))
-            mm = get_model(instance.internalModel,id)
-            nvar = get_numvars(instance.internalModel,id)
+            assert(id in getLocalScenarioIDs(instance.internalModel))
+            mm = getModel(instance.internalModel,id)
+            nvar = getNumVars(instance.internalModel,id)
             @assert length(x0) == nvar
             
             for i=1:nvar
@@ -112,14 +112,14 @@ type StructJuMPModel <: ModelInterface
         instance.str_prob_info = function(id,mode,clb,cub,rlb,rub)
             # @show id
             if mode == :Structure
-                nn = get_numvars(instance.internalModel,id)
-                mm = get_numcons(instance.internalModel,id)
+                nn = getNumVars(instance.internalModel,id)
+                mm = getNumCons(instance.internalModel,id)
                 # @show nn,mm
                 return (nn,mm)
             elseif mode == :Values
                 # @show length(clb),length(cub)
-                mm = get_model(instance.internalModel,id)
-                nvar = get_numvars(instance.internalModel,id)
+                mm = getModel(instance.internalModel,id)
+                nvar = getNumVars(instance.internalModel,id)
                 @assert length(clb) == nvar 
                 @assert length(cub) == nvar
                 array_copy(mm.colUpper, 1, cub, 1, nvar)
@@ -163,7 +163,7 @@ type StructJuMPModel <: ModelInterface
             # x0, x1 = load_x("pips", instance.n_iter)
 
             e = get_nlp_evaluator(instance.internalModel,id)
-            g = Vector{Float64}(get_numcons(instance.internalModel,id))
+            g = Vector{Float64}(getNumCons(instance.internalModel,id))
             MathProgBase.eval_g(e,g,build_x(instance.internalModel,id,x0,x1))
             (eq_idx, ieq_idx) = instance.id_con_idx_map[id]
             @assert length(new_eq_g) == length(eq_idx)
@@ -190,8 +190,8 @@ type StructJuMPModel <: ModelInterface
             x = build_x(instance.internalModel,rowid,x0,x1)
             g = Vector{Float64}(length(x))
             MathProgBase.eval_grad_f(e,g,x)
-            @assert length(g) == MathProgBase.numvar(get_model(instance.internalModel,rowid))
-            @assert length(new_grad_f) == get_numvars(instance.internalModel,colid)
+            @assert length(g) == MathProgBase.numvar(getModel(instance.internalModel,rowid))
+            @assert length(new_grad_f) == getNumVars(instance.internalModel,colid)
 
             var_idx_map = get_jac_col_var_idx(instance.internalModel,rowid,colid)
             for i in var_idx_map
@@ -241,10 +241,10 @@ type StructJuMPModel <: ModelInterface
 
                 # @show eq_jac_I
                 # @show eq_jac_J
-                eq_jac = sparse(eq_jac_I,eq_jac_J,ones(Float64,length(eq_jac_I)),length(eq_idx),get_numvars(m,colid))
+                eq_jac = sparse(eq_jac_I,eq_jac_J,ones(Float64,length(eq_jac_I)),length(eq_idx),getNumVars(m,colid))
                 # @show ieq_jac_I
                 # @show ieq_jac_J
-                ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ones(Float64,length(ieq_jac_I)),length(ieq_idx),get_numvars(m,colid))
+                ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ones(Float64,length(ieq_jac_I)),length(ieq_idx),getNumVars(m,colid))
                 # @show (length(eq_jac.nzval), length(ieq_jac.nzval))
                 return (length(eq_jac.nzval), length(ieq_jac.nzval))
             elseif(mode == :Values)
@@ -281,8 +281,8 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(eq_jac_g) != 0)
-                    eq_jac = sparse(eq_jac_I,eq_jac_J,eq_jac_g, length(eq_idx),get_numvars(m,colid), keepzeros=true)
-                    # @printf("em=%d; en=%d;\n", length(eq_idx), get_numvars(m,colid))
+                    eq_jac = sparse(eq_jac_I,eq_jac_J,eq_jac_g, length(eq_idx),getNumVars(m,colid), keepzeros=true)
+                    # @printf("em=%d; en=%d;\n", length(eq_idx), getNumVars(m,colid))
                     # @show eq_jac_I, eq_jac_J, eq_jac_g
                     # @printf("ejac%d%d=sparse(eq_jac_I,eq_jac_J,eq_jac_g,em,en); \n",rowid,colid)
                 
@@ -298,8 +298,8 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(ieq_jac_g) != 0)
-                    ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g, length(ieq_idx),get_numvars(m,colid), keepzeros=true)
-                    # @printf("im=%d; in=%d;\n", length(ieq_idx), get_numvars(m,colid))
+                    ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g, length(ieq_idx),getNumVars(m,colid), keepzeros=true)
+                    # @printf("im=%d; in=%d;\n", length(ieq_idx), getNumVars(m,colid))
                     # @show ieq_jac_I, ieq_jac_J, ieq_jac_g
                     # @printf("ijac%d%d=sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g,im,in); \n",rowid,colid)
                     # @printf("jac%d%d=vcat(ejac%d%d,ijac%d%d) \n",rowid,colid,rowid,colid,rowid,colid)
@@ -429,12 +429,12 @@ type StructJuMPModel <: ModelInterface
                     if (rowid !=0 && colid == 0) #root contribution
                         (h0_J,h0_I) = MathProgBase.hesslag_structure(get_nlp_evaluator(m,0))
                         # @show h0_I,h0_J
-                        str_laghess = sparse([new_h_I;h0_I], [new_h_J;h0_J], [new_h;zeros(Float64,length(h0_I))], get_numvars(m,0),get_numvars(m,0), keepzeros=true)
+                        str_laghess = sparse([new_h_I;h0_I], [new_h_J;h0_J], [new_h;zeros(Float64,length(h0_I))], getNumVars(m,0),getNumVars(m,0), keepzeros=true)
                         
                         new_h_I = [new_h_I;h0_I]
                         new_h_J = [new_h_J;h0_J]
                         new_h = [new_h;zeros(Float64,length(h0_I))]
-                        # @printf("m=%d; n=%d; \n",get_numvars(m,0),get_numvars(m,0))
+                        # @printf("m=%d; n=%d; \n",getNumVars(m,0),getNumVars(m,0))
                         # @show new_h_I, new_h_J, new_h
                         # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
@@ -443,9 +443,9 @@ type StructJuMPModel <: ModelInterface
                         array_copy(str_laghess.nzval, 1,values,1,length(str_laghess.nzval)) 
                     else
                         @assert rowid == colid
-                        str_laghess = sparse(new_h_I,new_h_J,new_h,get_numvars(m,rowid),get_numvars(m,rowid),keepzeros = true)   
+                        str_laghess = sparse(new_h_I,new_h_J,new_h,getNumVars(m,rowid),getNumVars(m,rowid),keepzeros = true)   
                         
-                        # @printf("m=%d;n=%d; \n",get_numvars(m,rowid),get_numvars(m,rowid))
+                        # @printf("m=%d;n=%d; \n",getNumVars(m,rowid),getNumVars(m,rowid))
                         # @show new_h_I, new_h_J, new_h 
                         # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)                   
                         
@@ -479,9 +479,9 @@ type StructJuMPModel <: ModelInterface
                         end
                     end
                     
-                    str_laghess = sparse(new_h_I,new_h_J, new_h, get_numvars(m,colid), get_numvars(m,rowid), keepzeros =true)
+                    str_laghess = sparse(new_h_I,new_h_J, new_h, getNumVars(m,colid), getNumVars(m,rowid), keepzeros =true)
                     
-                    # @printf("m=%d; n=%d; \n", get_numvars(m,colid), get_numvars(m,rowid))
+                    # @printf("m=%d; n=%d; \n", getNumVars(m,colid), getNumVars(m,rowid))
                     # @show new_h_I, new_h_J, new_h
                     # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
@@ -507,13 +507,13 @@ type StructJuMPModel <: ModelInterface
         
         instance.str_write_solution = function(id, x, y_eq, y_ieq)
             # @show id, x, y_eq, y_ieq
-            @assert id in getScenarioIds(instance.internalModel)
+            @assert id in getLocalScenarioIDs(instance.internalModel)
             @assert length(x) == instance.get_num_cols(id)
             @assert length(y_eq) == instance.get_num_eq_cons(id)
             @assert length(y_ieq) == instance.get_num_ineq_cons(id)
 
             #write back the primal to JuMP
-            mm = get_model(instance.internalModel,id)
+            mm = getModel(instance.internalModel,id)
             for i = 1:length(x)
                 setvalue(Variable(mm,i), x[i])
             end

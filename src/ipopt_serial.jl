@@ -1,4 +1,4 @@
-module SerialIpoptInterface
+module IpoptInterfaceSerial
 
 using StructJuMP, JuMP, StructJuMPSolverInterface
 using Ipopt

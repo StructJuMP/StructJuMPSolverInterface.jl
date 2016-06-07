@@ -1,15 +1,18 @@
 # structure_helper.jl
 
+##!feng merge this into parallel_pips_xxx and/or helper.jl
+##! after that nonstruct_helper.jl and structure_helper.jl should be deleted
+
 export init_constraints_idx_map, build_x, get_jac_col_var_idx, get_h_var_idx
 
 function init_constraints_idx_map(m,map)
     assert(length(map) == 0)
-    for id in getScenarioIds(m)
+    for id in getLocalScenarioIDs(m)
         e = get_nlp_evaluator(m,id) #initialize the nlp evaluator
         eq_idx = Dict{Int,Int}()
         ieq_idx = Dict{Int,Int}()
         push!(map,id=>Pair(eq_idx,ieq_idx))
-        lb,ub=JuMP.constraintbounds(get_model(m,id))
+        lb,ub=JuMP.constraintbounds(getModel(m,id))
 
         for i =1:length(lb)
             if lb[i] == ub[i]
@@ -29,7 +32,7 @@ function build_x(m,id,x0,x1)
         return x0
     else
         #build x using index tracking info
-        mm = get_model(m,id)
+        mm = getModel(m,id)
         othermap = getStructure(mm).othermap
         new_x = Vector{Float64}(MathProgBase.numvar(mm))
         unsafe_copy!(new_x,1,x1,1,length(x1)) 
@@ -50,13 +53,13 @@ function get_jac_col_var_idx(m,rowid, colid)  #this method customerized for no l
     # @show "get_jac_col_var_idx",rowid,colid
     idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
     if rowid == colid
-        nvar = get_numvars(m,rowid)
+        nvar = getNumVars(m,rowid)
         for i = 1:nvar
             idx_map[i] = i
         end
     else
         @assert rowid!=0 && rowid != colid
-        mm = get_model(m,rowid)
+        mm = getModel(m,rowid)
         othermap = getStructure(mm).othermap
         for p in othermap
             pidx = p[1].col
@@ -73,24 +76,24 @@ function get_h_var_idx(m,rowid, colid)
     col_idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
     row_idx_map = Dict{Int,Int}()
     if rowid == colid
-        nvar = get_numvars(m,rowid) #need to place model variable in front of non model variable.
+        nvar = getNumVars(m,rowid) #need to place model variable in front of non model variable.
         for i = 1:nvar
             col_idx_map[i] = i
             row_idx_map[i] = i
         end
     elseif rowid == 0  && colid != 0 #border
-        mm = get_model(m,colid)
+        mm = getModel(m,colid)
         othermap = getStructure(mm).othermap
         for p in othermap
             pidx = p[1].col
             cidx = p[2].col
             col_idx_map[cidx] = pidx
         end
-        for i = 1:get_numvars(m,colid)
+        for i = 1:getNumVars(m,colid)
             row_idx_map[i] = i
         end
     elseif colid == 0 && rowid != 0 #root contrib.
-        mm = get_model(m,rowid)
+        mm = getModel(m,rowid)
         othermap = getStructure(mm).othermap
         for p in othermap
             pidx = p[1].col

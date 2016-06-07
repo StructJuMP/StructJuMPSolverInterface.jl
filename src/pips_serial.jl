@@ -2,7 +2,7 @@
 # "unstructured" (and therefore serial) PIPS-NLP interface
 #
 
-module PipsNlpInterface_serial #SerialPipsNlpInterface
+module PipsNlpInterfaceSerial #SerialPipsNlpInterface
 
 
 using StructJuMP, JuMP

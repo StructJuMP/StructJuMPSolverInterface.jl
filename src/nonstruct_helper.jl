@@ -1,5 +1,7 @@
 # nonstruct_helper.jl
 
+##!feng this should go to pips_serial_xxx.jl
+
 ### for non structure solver
 export strip_x
 

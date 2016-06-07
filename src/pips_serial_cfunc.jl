@@ -2,7 +2,7 @@
 # This module is a wrapper for the C, unstructured (thus serial) interface of PIPS-NLP
 #
 
-module PipsNlpSolver_serial
+module PipsNlpSolverSerial
 
 include("pips_serial_cfunc.jl")
 
