@@ -1,30 +1,13 @@
-module ParPipsNlpInterface
+module PipsNlpInterface #ParPipsNlpInterface
+
+
 
 using StructJuMP, JuMP
 using MPI
 using StructJuMPSolverInterface
-using PIPS_NLP, ParPipsNlp
+using PipsNlpSolver
 
 import MathProgBase
-
-# function load_x(subdir,iter)
-#     @printf("load x from ./%s/x%d \n",subdir,iter)
-#     x = readdlm(string("./",subdir,"/x",iter))
-#     x0 = x[1:78]
-#     x1 = x[79:144]
-#     return x0, x1
-# end
-
-# function write_x0(subdir,iter,x)
-#     @printf("writing x to ./%s/x0_%d \n",subdir,iter)
-#     run(`mkdir -p ./$subdir`)
-#     writedlm(string("./",subdir,"/x0_",iter),x,",")
-# end
-# function write_x1(subdir,iter,x)
-#     @printf("writing x to ./%s/x1_%d \n",subdir,iter)
-#     run(`mkdir -p ./$subdir`)
-#     writedlm(string("./",subdir,"/x1_",iter),x,",")
-# end
 
 type StructJuMPModel <: ModelInterface
     internalModel::JuMP.Model
@@ -570,7 +553,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     if with_prof
         tic()
     end    
-    prob = ParPipsNlp.createProblemStruct(comm, StructJuMPModel(model), with_prof)
+    prob = PipsNlpSolver.createProblemStruct(comm, StructJuMPModel(model), with_prof)
 
     if with_prof
         t_sj_model_init += toq()
@@ -582,7 +565,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     if with_prof
         tic()
     end
-    status = ParPipsNlp.solveProblemStruct(prob)
+    status = PipsNlpSolver.solveProblemStruct(prob)
     
     if with_prof
         t_sj_solver_total += toq()
@@ -624,7 +607,26 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     return status
 end
 
-KnownSolvers["ParPips"] = ParPipsNlpInterface.structJuMPSolve
+# function load_x(subdir,iter)
+#     @printf("load x from ./%s/x%d \n",subdir,iter)
+#     x = readdlm(string("./",subdir,"/x",iter))
+#     x0 = x[1:78]
+#     x1 = x[79:144]
+#     return x0, x1
+# end
+
+# function write_x0(subdir,iter,x)
+#     @printf("writing x to ./%s/x0_%d \n",subdir,iter)
+#     run(`mkdir -p ./$subdir`)
+#     writedlm(string("./",subdir,"/x0_",iter),x,",")
+# end
+# function write_x1(subdir,iter,x)
+#     @printf("writing x to ./%s/x1_%d \n",subdir,iter)
+#     run(`mkdir -p ./$subdir`)
+#     writedlm(string("./",subdir,"/x1_",iter),x,",")
+# end
+
+KnownSolvers["PipsNlp"] = PipsNlpInterface.structJuMPSolve
 
 end
 

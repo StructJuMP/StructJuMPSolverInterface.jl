@@ -1,10 +1,13 @@
+#
+# "unstructured" (and therefore serial) PIPS-NLP interface
+#
 
-module SerialPipsNlpInterface
+module PipsNlpInterface_serial #SerialPipsNlpInterface
+
 
 using StructJuMP, JuMP
 using StructJuMPSolverInterface
-using PIPS_NLP
-using PipsNlp
+using PipsNlpSolver_serial
 
 import MathProgBase
 
@@ -368,6 +371,6 @@ function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     return status
 end
 
-KnownSolvers["Pips"] = SerialPipsNlpInterface.structJuMPSolve
+KnownSolvers["PipsNlpSerial"] = PipsNlpInterface_serial.structJuMPSolve
 
 end
