@@ -1,11 +1,15 @@
+#
+# Interface for PIPS-NLP parallel (structured interface)
+#
+
 module PipsNlpInterface #ParPipsNlpInterface
 
-
+include("pips_parallel_cfunc.jl")
 
 using StructJuMP, JuMP
 using MPI
 using StructJuMPSolverInterface
-using PipsNlpSolver
+#using PipsNlpSolver
 
 import MathProgBase
 
@@ -571,7 +575,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         t_sj_solver_total += toq()
     end
 
-    freeProblemStruct(prob)
+    PipsNlpSolver.freeProblemStruct(prob)
     
     if with_prof
         t_sj_lifetime += toq()

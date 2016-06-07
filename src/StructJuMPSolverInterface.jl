@@ -1,3 +1,6 @@
+#
+# front-end for StructJuMP solvers interfaces
+#
 
 module StructJuMPSolverInterface
 
@@ -23,7 +26,7 @@ include("structure_helper.jl")
 include("nonstruct_helper.jl")
 end # module
 
-include("./solver/pips_parallel_cfunc.jl")
-include("./solver/pips_parallel.jl")
+
+include("pips_parallel.jl")
 #include("./solver/pips_serial.jl")
 #include("./solver/ipopt_serial.jl")

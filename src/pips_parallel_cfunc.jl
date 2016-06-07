@@ -2,14 +2,16 @@
 # Wrapper for the paralel/structured PIPS-NLP interface
 #
 
-module PipsNlpSolver  #ParPipsNlp
+module PipsNlpSolver  
 
 using StructJuMPSolverInterface
 import MPI
 
 try
   sharedLib=ENV["PIPS_NLP_PAR_SHARED_LIB"]
-  #explicitly check if the file exists (because dlopen sometimes does not throw an error for invalid filenames, resulting in a seg fault)
+  
+  # Explicitly check if the file exists. dlopen sometimes does not throw an 
+  # error for invalid filenames, resulting in a seg fault)
   if(!isfile(sharedLib))
     error(string("The specified shared library ([", sharedLib, "]) does not exist"))
   end  
