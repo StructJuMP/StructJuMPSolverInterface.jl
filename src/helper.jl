@@ -3,30 +3,50 @@
 using StructJuMP, JuMP
 import MathProgBase
 
-export  get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @pips_second_stage, message
+export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @pips_second_stage, message
+export strip_x, build_x
 
-function write_x(subdir,iter,x)
-    @printf("writing x to ./%s/x%d \n",subdir,iter)
-    run(`mkdir -p ./$subdir`)
-    writedlm(string("./",subdir,"/x",iter),x,",")
+function strip_x(m,id,x,start_idx)
+    mm = getModel(m,id)
+    nx = getNumVars(m,id)
+    new_x = Vector{Float64}(MathProgBase.numvar(mm))
+    array_copy(x,start_idx,new_x,1,nx)
+
+    othermap = getStructure(mm).othermap
+    for i in othermap
+        pid = i[1].col
+        cid = i[2].col
+        new_x[cid] = x[pid]
+        @assert cid > nx
+    end
+    return new_x
 end
 
-function message(s)
-    rank, nprocs = getMyRank()
-    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
-end
 
-macro pips_second_stage(m,ind,code)
-    show(m)
-    show(ind)
-    show(code)
-    return quote
-        proc_idx_set = getScenarioIds($(esc(m)))
-        for $(esc(ind)) in proc_idx_set
-            $(esc(code))
+function build_x(m,id,x0,x1)
+    # @show "build_x", id, length(x0), length(x1)
+    # @show x0, x1
+    if id==0
+        # @show x0
+        return x0
+    else
+        #build x using index tracking info
+        mm = getModel(m,id)
+        othermap = getStructure(mm).othermap
+        new_x = Vector{Float64}(MathProgBase.numvar(mm))
+        unsafe_copy!(new_x,1,x1,1,length(x1)) 
+        for e in othermap
+            pidx = e[1].col
+            cidx = e[2].col
+            # @show pidx, cidx
+            assert(cidx > length(x1))
+            new_x[cidx] = x0[pidx]
         end
+        # @show new_x
+        return new_x
     end
 end
+
 
 function get_nlp_evaluator(m,id)
     # @show id,getScenarioIds(m)
@@ -64,9 +84,6 @@ function convert_to_c_idx(indicies)
     end
 end
 
-
-
-
 function convert_to_lower(I,J,rI,rJ)
     @assert length(I) == length(J) == length(rI) == length(rJ)
     for i in 1:length(I)
@@ -79,6 +96,29 @@ function convert_to_lower(I,J,rI,rJ)
         end
     end
     return rI, rJ
+end
+
+function write_x(subdir,iter,x)
+    @printf("writing x to ./%s/x%d \n",subdir,iter)
+    run(`mkdir -p ./$subdir`)
+    writedlm(string("./",subdir,"/x",iter),x,",")
+end
+
+function message(s)
+    rank, nprocs = getMyRank()
+    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
+end
+
+macro pips_second_stage(m,ind,code)
+    show(m)
+    show(ind)
+    show(code)
+    return quote
+        proc_idx_set = getLocalScenarioIds($(esc(m)))
+        for $(esc(ind)) in proc_idx_set
+            $(esc(code))
+        end
+    end
 end
 
 function SparseMatrix.sparse(I,J,V, M, N;keepzeros=false)

@@ -15,7 +15,7 @@ try
   if(!isfile(sharedLib))
     error(string("The specified shared library ([", sharedLib, "]) does not exist"))
   end  
-  const libparpipsnlp=Libdl.dlopen(get(ENV,"PIPS_NLP_PAR_SHARED_LIB",""))
+  global const libparpipsnlp=Libdl.dlopen(get(ENV,"PIPS_NLP_PAR_SHARED_LIB",""))
 catch 
   warn("Could not load PIPS-NLP shared library. Make sure the ENV variable 'PIPS_NLP_PAR_SHARED_LIB' points to its location, usually in the PIPS repo at PIPS/build_pips/PIPS-NLP/libparpipsnlp.so")
   rethrow()
@@ -140,16 +140,13 @@ type PipsNlpProblemStruct
     t_jl_eval_total::Float64
     
     function PipsNlpProblemStruct(comm, model, prof)
-        @show prof
         prob = new(C_NULL, model, comm, prof,-3
             ,0.0,0.0,0.0,0.0,0.0
             ,0.0,0.0,0.0,0.0,0.0
             ,0.0,0.0
             )
-        # Free the internal PipsNlpProblem structure when
-        # the Julia IpoptProblem instance goes out of scope
         finalizer(prob, freeProblemStruct)
-        # Return the object we just made
+        
         return prob
     end
 end
@@ -161,7 +158,7 @@ immutable CallBackData
 end
 
 export  ModelInterface, FakeModel,
-        createProblemStruct, solveProblemStruct, freeProblemStruct
+        createProblemStruct, solveProblemStruct
 
 ###########################################################################
 # Callback wrappers
@@ -538,7 +535,7 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
     # println(" callback created ")
     prob = PipsNlpProblemStruct(comm, model, prof)
     # @show prob
-    ret = ccall((:CreatePipsNlpProblemStruct,:libparpipsnlp),Ptr{Void},
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:CreatePipsNlpProblemStruct),Ptr{Void},
             (MPI.Comm, 
             Cint, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
@@ -573,7 +570,7 @@ function solveProblemStruct(prob::PipsNlpProblemStruct)
     # println("solveProblemStruct - julia")
     # @show prob
     
-    ret = ccall((:PipsNlpSolveStruct,:libparpipsnlp), Cint, 
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:PipsNlpSolveStruct), Cint, 
             (Ptr{Void},),
             prob.ref)
     
@@ -586,7 +583,7 @@ end
 
 function freeProblemStruct(prob::PipsNlpProblemStruct)
     # @show "freeProblemStruct"
-    ret = ccall((:FreePipsNlpProblemStruct,:libparpipsnlp),
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:FreePipsNlpProblemStruct),
             Void, (Ptr{Void},),
             prob.ref)
     # @show ret
@@ -622,7 +619,6 @@ function t_reset(prob::PipsNlpProblemStruct)
     prob.t_jl_write_solution = 0.0
     return total
 end
-# include("PipsNlpSolverInterface.jl")
 
 end
 

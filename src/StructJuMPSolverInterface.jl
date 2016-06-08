@@ -4,33 +4,55 @@
 
 module StructJuMPSolverInterface
 
+import MPI
 
 # Struct Model interface
 abstract ModelInterface
 
-export ModelInterface, KnownSolvers, sj_solve, getModel, getVarValue, getVarValues, getNumVars, getNumCons, getTotalNumVars, getTotalNumCons, getLocalScenarioIDs, getLocalChildrenIds
+export ModelInterface, KnownSolvers, sj_solve, getModel, getVarValue, getVarValues, getNumVars, 
+        getNumCons, getTotalNumVars, getTotalNumCons, getLocalScenarioIds, getLocalChildrenIds,
+        getObjectiveVal
 
-KnownSolvers = Dict{AbstractString,Function}();
+const KnownSolvers = Dict{AbstractString,Function}();
+const SolverStatus = Dict{Int, Symbol}(
+  0=>:Optimal,
+  1=>:Infesible,
+  2=>:Unbounded,
+  3=>:IterationExceeded
+  )
 
 function sj_solve(model; solver="Unknown", with_prof=false, suppress_warmings=false,kwargs...)
     if !haskey(KnownSolvers,solver)
         Base.warn("Unknow solver: ", solver)
         Base.error("Known solvers are: ", keys(KnownSolvers))
     end
-    KnownSolvers[solver](model; with_prof=with_prof, suppress_warmings=false,kwargs...)
+    status = KnownSolvers[solver](model; with_prof=with_prof, suppress_warmings=false,kwargs...)
+    
+    if !haskey(SolverStatus,status)
+      Base.warn("solver can't solve the problem");
+      return :Error
+    else
+      return SolverStatus[status]
+    end
+    # @show getLocalChildrenIds(m)
+
+    MPI.Finalize()
 end
+
+
 
 # package code goes here
 include("helper.jl")
-include("structure_helper.jl")
-include("nonstruct_helper.jl")
+# include("structure_helper.jl")
+# include("nonstruct_helper.jl")
 
 function getModel(m,id)
     return id==0?m:getchildren(m)[id]
 end
 
 function getVarValues(m,id)
-    mm = getModel(m,0); v = Float64[];
+    mm = getModel(m,id); 
+    v = Float64[];
     for i = 1:getNumVars(m,id)
         v = [v;JuMP.getvalue(JuMP.Variable(mm,i))]
     end
@@ -46,6 +68,36 @@ end
 ##!feng function getObjectiveValue(m)
 ##! It seems that getobjectivevalue(m) does not return the correct objetive value
 ##!feng end
+function getObjectiveVal(m)
+  #MPI is already finalized , therefore returns only objective value at local nodes
+  # mid, nprocs = getMyRank()
+  # lobj = 0.0
+  # x0 = getVarValues(m,0)
+
+  # if mid == 0
+  #   e =  get_nlp_evaluator(m,0)
+  #   lobj = MathProgBase.eval_f(e,build_x(m,0,x0,x0))
+  # end
+
+  # for i in getLocalChildrenIds(m)
+  #     x1 = getVarValues(m,i)
+  #     lobj += MathProgBase.eval_f(get_nlp_evaluator(m,i),build_x(m,i,x0,x1))
+  # end
+
+  # obj = MPI.Reduce(lobj,MPI.SUM,0,getStructure(m).comm)
+  lobj =0.0
+  x0 = getVarValues(m,0)
+  # @show x0
+  e = get_nlp_evaluator(m,0)
+  lobj = MathProgBase.eval_f(e,build_x(m,0,x0,x0))
+  for i in getchildren(m)
+    id = i[1]
+    e = get_nlp_evaluator(m,id)
+    x1 = getVarValues(m,id)
+    lobj += MathProgBase.eval_f(e,build_x(m,id,x0,x1))
+  end
+  return lobj;
+end
 
 function getNumVars(m,id)
   mm = getModel(m,id)
@@ -74,7 +126,7 @@ function getTotalNumCons(m)
     return ncon
 end
 
-function getLocalScenarioIDs(m)
+function getLocalScenarioIds(m)
   myrank,mysize = getMyRank()
   numScens = num_scenarios(m)
   d = div(numScens,mysize)
@@ -85,6 +137,7 @@ end
 
 function getLocalChildrenIds(m)
     myrank,mysize = getMyRank()
+    # @show myrank, mysize
     numScens = num_scenarios(m)
     d = div(numScens,mysize)
     s = myrank * d + 1
@@ -96,5 +149,5 @@ end # module StructJuMPSolverInterface
 
 
 include("pips_parallel.jl")
-#include("./solver/pips_serial.jl")
-#include("./solver/ipopt_serial.jl")
+include("pips_serial.jl")
+include("ipopt_serial.jl")

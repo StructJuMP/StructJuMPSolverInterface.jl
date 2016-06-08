@@ -1,15 +1,13 @@
 #
 # Interface for PIPS-NLP parallel (structured interface)
 #
-
-module PipsNlpInterface #ParPipsNlpInterface
-
 include("pips_parallel_cfunc.jl")
 
+module PipsNlpInterface 
+
+using PipsNlpSolver
 using StructJuMP, JuMP
-using MPI
 using StructJuMPSolverInterface
-#using PipsNlpSolver
 
 import MathProgBase
 
@@ -64,6 +62,7 @@ type StructJuMPModel <: ModelInterface
             Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}()
             # ,prof,0,0,0,0,0,0,0,0,0
             )
+        
         init_constraints_idx_map(model,instance.id_con_idx_map)
         
         instance.get_num_scen = function()
@@ -97,7 +96,7 @@ type StructJuMPModel <: ModelInterface
 
 
         instance.str_init_x0 = function(id,x0)
-            assert(id in getLocalScenarioIDs(instance.internalModel))
+            assert(id in getLocalScenarioIds(instance.internalModel))
             mm = getModel(instance.internalModel,id)
             nvar = getNumVars(instance.internalModel,id)
             @assert length(x0) == nvar
@@ -507,7 +506,7 @@ type StructJuMPModel <: ModelInterface
         
         instance.str_write_solution = function(id, x, y_eq, y_ieq)
             # @show id, x, y_eq, y_ieq
-            @assert id in getLocalScenarioIDs(instance.internalModel)
+            @assert id in getLocalScenarioIds(instance.internalModel)
             @assert length(x) == instance.get_num_cols(id)
             @assert length(y_eq) == instance.get_num_eq_cons(id)
             @assert length(y_ieq) == instance.get_num_ineq_cons(id)
@@ -536,11 +535,13 @@ end
 #     return t_model_time
 # end
 
+
+
+
+
 #######
 # Linking with PIPS Julia Structure interface
 ######
-
-# setsolverhook(model,structJuMPSolve)
 
 function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs...)
     # @show "solve"
@@ -575,8 +576,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         t_sj_solver_total += toq()
     end
 
-    PipsNlpSolver.freeProblemStruct(prob)
-    
+
     if with_prof
         t_sj_lifetime += toq()
     end
@@ -606,7 +606,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         n2 = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".c.txt")
         run(`mv $n1 $n2`)
     end
-    MPI.Finalize()
+    # MPI.Finalize()
 
     return status
 end
@@ -629,6 +629,85 @@ end
 #     run(`mkdir -p ./$subdir`)
 #     writedlm(string("./",subdir,"/x1_",iter),x,",")
 # end
+
+function init_constraints_idx_map(m,map)
+    assert(length(map) == 0)
+    for id in getLocalScenarioIds(m)
+        e = get_nlp_evaluator(m,id) #initialize the nlp evaluator
+        eq_idx = Dict{Int,Int}()
+        ieq_idx = Dict{Int,Int}()
+        push!(map,id=>Pair(eq_idx,ieq_idx))
+        lb,ub=JuMP.constraintbounds(getModel(m,id))
+
+        for i =1:length(lb)
+            if lb[i] == ub[i]
+                eq_idx[i] = length(eq_idx) + 1
+            else
+                ieq_idx[i] =length(ieq_idx) + 1 #remember to offset length(eq_idx)
+            end
+        end
+    end
+end
+
+function get_jac_col_var_idx(m,rowid, colid)  #this method customerized for no linking constraint presented
+    # @show "get_jac_col_var_idx",rowid,colid
+    idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
+    if rowid == colid
+        nvar = getNumVars(m,rowid)
+        for i = 1:nvar
+            idx_map[i] = i
+        end
+    else
+        @assert rowid!=0 && rowid != colid
+        mm = getModel(m,rowid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            idx_map[cidx] = pidx
+        end
+    end
+    # @show idx_map
+    return idx_map
+end
+
+function get_h_var_idx(m,rowid, colid)
+    # @show "get_h_var_idx",rowid,colid
+    col_idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
+    row_idx_map = Dict{Int,Int}()
+    if rowid == colid
+        nvar = getNumVars(m,rowid) #need to place model variable in front of non model variable.
+        for i = 1:nvar
+            col_idx_map[i] = i
+            row_idx_map[i] = i
+        end
+    elseif rowid == 0  && colid != 0 #border
+        mm = getModel(m,colid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            col_idx_map[cidx] = pidx
+        end
+        for i = 1:getNumVars(m,colid)
+            row_idx_map[i] = i
+        end
+    elseif colid == 0 && rowid != 0 #root contrib.
+        mm = getModel(m,rowid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            col_idx_map[cidx] = pidx
+            row_idx_map[cidx] = pidx
+        end
+    else
+        @assert false rowid colid
+    end
+    # @show col_idx_map,row_idx_map
+    return col_idx_map,row_idx_map
+end
+
 
 KnownSolvers["PipsNlp"] = PipsNlpInterface.structJuMPSolve
 

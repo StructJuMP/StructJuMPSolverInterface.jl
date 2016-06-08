@@ -4,11 +4,9 @@
 
 module PipsNlpSolverSerial
 
-include("pips_serial_cfunc.jl")
-
 using StructJuMPSolverInterface
 
-export createProblem, solveProblem, freeProblem
+export createProblem, solveProblem
 
 try
   sharedLib=ENV["PIPS_NLP_SHARED_LIB"]
@@ -16,7 +14,7 @@ try
   if(!isfile(sharedLib))
     error(string("The specified shared library ([", sharedLib, "]) does not exist"))
   end  
-  const libparpipsnlp=Libdl.dlopen(get(ENV,"PIPS_NLP_SHARED_LIB",""))
+  global const libparpipsnlp=Libdl.dlopen(get(ENV,"PIPS_NLP_SHARED_LIB",""))
 catch 
   warn("Could not load PIPS-NLP shared library. Make sure the ENV variable 'PIPS_NLP_SHARED_LIB' points to its location, usually in the PIPS repo at PIPS/build_pips/PIPS-NLP/libpipsnlp.so")
   rethrow()
@@ -57,8 +55,6 @@ type PipsNlpProblem
         eval_f, eval_g, eval_grad_f, eval_jac_g, eval_h, nzJac, nzHess,
         :Min)
         
-        # Free the internal PipsNlpProblem structure when
-        # the Julia IpoptProblem instance goes out of scope
         finalizer(prob, freeProblem)
         # Return the object we just made
         prob
@@ -179,7 +175,7 @@ function createProblem(n::Int,m::Int,
     eval_jac_g_cb = cfunction(eval_jac_g_wrapper, Cint, (Ptr{Float64}, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}, Ptr{Void}))
     eval_h_cb = cfunction(eval_h_wrapper, Cint, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}, Ptr{Void}))
     
-    ret = ccall((:CreatePipsNlpProblem,:libpipsnlp),Ptr{Void},
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:CreatePipsNlpProblem),Ptr{Void},
             (Cint, Cint,
             Ptr{Float64}, Ptr{Float64},
             Ptr{Float64}, Ptr{Float64},
@@ -206,7 +202,7 @@ function solveProblem(prob::PipsNlpProblem)
     # @show "solveProblem"    
     
     final_objval = [0.0]
-    ret = ccall((:PipsNlpSolve, :libpipsnlp), Cint, 
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:PipsNlpSolve), Cint, 
             (Ptr{Void}, Ptr{Float64}, Ptr{Float64}, Any),
             prob.ref, final_objval, prob.x, prob)
     prob.obj_val = final_objval[1]
@@ -217,7 +213,7 @@ end
 
 function freeProblem(prob::PipsNlpProblem)
     # @show "freeProblem"
-    ret = ccall((:FreePipsNlpProblem, :libpipsnlp),
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:FreePipsNlpProblem),
             Void, (Ptr{Void},),
             prob.ref)
     # @show ret
