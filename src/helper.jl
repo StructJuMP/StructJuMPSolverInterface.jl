@@ -3,7 +3,7 @@
 using StructJuMP, JuMP
 import MathProgBase
 
-export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @pips_second_stage, message
+export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @declare_second_stage, message
 export strip_x, build_x
 
 function strip_x(m,id,x,start_idx)
@@ -109,12 +109,10 @@ function message(s)
     @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
 end
 
-macro pips_second_stage(m,ind,code)
-    show(m)
-    show(ind)
-    show(code)
+macro declare_second_stage(m,ind,code)
     return quote
-        proc_idx_set = getLocalScenarioIds($(esc(m)))
+        proc_idx_set = getLocalChildrenIds($(esc(m)))
+        # @show proc_idx_set
         for $(esc(ind)) in proc_idx_set
             $(esc(code))
         end
