@@ -1,90 +1,58 @@
 #helper.jl
+
 using StructJuMP, JuMP
 import MathProgBase
 
-export  get_model,  get_numcons,  get_numvars, get_var_value, get_nlp_evaluator, convert_to_lower,
-        array_copy, write_mat_to_file, convert_to_c_idx, g_numvars, g_numcons, getVarValue,
-        getScenarioIds, getVarValue, write_x, getSubScenId, @pips_second_stage, message
+export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @declare_second_stage, message
+export strip_x, build_x
 
-function write_x(subdir,iter,x)
-    @printf("writing x to ./%s/x%d \n",subdir,iter)
-    run(`mkdir -p ./$subdir`)
-    writedlm(string("./",subdir,"/x",iter),x,",")
-end
+function strip_x(m,id,x,start_idx)
+    mm = getModel(m,id)
+    nx = getNumVars(m,id)
+    new_x = Vector{Float64}(MathProgBase.numvar(mm))
+    array_copy(x,start_idx,new_x,1,nx)
 
-function message(s)
-    rank, nprocs = getMyRank()
-    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
-end
-
-function getScenarioIds(m::JuMP.Model)
-    myrank,mysize = getMyRank()
-    numScens = num_scenarios(m)
-    d = div(numScens,mysize)
-    s = myrank * d + 1
-    e = myrank == (mysize-1)? numScens:s+d-1
-    ids = [0;s:e]
-end
-
-function getSubScenId(m::JuMP.Model)
-    myrank,mysize = getMyRank()
-    numScens = num_scenarios(m)
-    d = div(numScens,mysize)
-    s = myrank * d + 1
-    e = myrank == (mysize-1)? numScens:s+d-1
-    ids = collect(s:e)
+    othermap = getStructure(mm).othermap
+    for i in othermap
+        pid = i[1].col
+        cid = i[2].col
+        new_x[cid] = x[pid]
+        @assert cid > nx
+    end
+    return new_x
 end
 
 
-macro pips_second_stage(m,ind,code)
-    show(m)
-    show(ind)
-    show(code)
-    return quote
-        proc_idx_set = getScenarioIds($(esc(m)))
-        for $(esc(ind)) in proc_idx_set
-            $(esc(code))
+function build_x(m,id,x0,x1)
+    # @show "build_x", id, length(x0), length(x1)
+    # @show x0, x1
+    if id==0
+        # @show x0
+        return x0
+    else
+        #build x using index tracking info
+        mm = getModel(m,id)
+        othermap = getStructure(mm).othermap
+        new_x = Vector{Float64}(MathProgBase.numvar(mm))
+        unsafe_copy!(new_x,1,x1,1,length(x1)) 
+        for e in othermap
+            pidx = e[1].col
+            cidx = e[2].col
+            # @show pidx, cidx
+            assert(cidx > length(x1))
+            new_x[cidx] = x0[pidx]
         end
+        # @show new_x
+        return new_x
     end
 end
 
-function get_model(m,id)
-    return id==0?m:getchildren(m)[id]
-end
-
-function getVarValue(m)
-    ids = getScenarioIds(m)
-    for i in ids
-        @printf "At node : %d\n" i
-        @printf "\t %s \n" get_var_value(m,i)
-    end
-end
-
-function get_numvars(m,id)
-    mm = get_model(m,id)
-    nvar = MathProgBase.numvar(mm) - length(getStructure(mm).othermap)
-    return nvar
-end
-
-function get_numcons(m,id)
-    mm = get_model(m,id)
-    return MathProgBase.numconstr(mm)
-end
-
-function get_var_value(m,id)
-    mm = get_model(m,id)
-    v = Float64[];
-    for i = 1:get_numvars(m,id)
-        v = [v;JuMP.getvalue(JuMP.Variable(mm,i))]
-    end
-    return v
-end
 
 function get_nlp_evaluator(m,id)
     # @show id,getScenarioIds(m)
     # @show getProcIdxSet(m)
     # assert(id == 0 || id in getProcIdxSet(m))
-    e = JuMP.NLPEvaluator(get_model(m,id))
+    e = JuMP.NLPEvaluator(getModel(m,id))
     MathProgBase.initialize(e,[:Grad,:Jac,:Hess])
     return e
 end
@@ -116,23 +84,6 @@ function convert_to_c_idx(indicies)
     end
 end
 
-
-function g_numcons(m)
-    ncon = 0
-    for i=0:num_scenarios(m)
-        ncon += get_numcons(m,i)
-    end
-    return ncon
-end
-
-function g_numvars(m)
-    nvar = 0
-    for i=0:num_scenarios(m)
-        nvar += get_numvars(m,i)
-    end
-    return nvar
-end
-
 function convert_to_lower(I,J,rI,rJ)
     @assert length(I) == length(J) == length(rI) == length(rJ)
     for i in 1:length(I)
@@ -145,6 +96,27 @@ function convert_to_lower(I,J,rI,rJ)
         end
     end
     return rI, rJ
+end
+
+function write_x(subdir,iter,x)
+    @printf("writing x to ./%s/x%d \n",subdir,iter)
+    run(`mkdir -p ./$subdir`)
+    writedlm(string("./",subdir,"/x",iter),x,",")
+end
+
+function message(s)
+    rank, nprocs = getMyRank()
+    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
+end
+
+macro declare_second_stage(m,ind,code)
+    return quote
+        proc_idx_set = getLocalChildrenIds($(esc(m)))
+        # @show proc_idx_set
+        for $(esc(ind)) in proc_idx_set
+            $(esc(code))
+        end
+    end
 end
 
 function SparseMatrix.sparse(I,J,V, M, N;keepzeros=false)

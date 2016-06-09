@@ -1,30 +1,15 @@
-module ParPipsNlpInterface
+#
+# Interface for PIPS-NLP parallel (structured interface)
+#
+include("pips_parallel_cfunc.jl")
 
+module PipsNlpInterface 
+
+using PipsNlpSolver
 using StructJuMP, JuMP
-using MPI
 using StructJuMPSolverInterface
-using PIPS_NLP, ParPipsNlp
 
 import MathProgBase
-
-# function load_x(subdir,iter)
-#     @printf("load x from ./%s/x%d \n",subdir,iter)
-#     x = readdlm(string("./",subdir,"/x",iter))
-#     x0 = x[1:78]
-#     x1 = x[79:144]
-#     return x0, x1
-# end
-
-# function write_x0(subdir,iter,x)
-#     @printf("writing x to ./%s/x0_%d \n",subdir,iter)
-#     run(`mkdir -p ./$subdir`)
-#     writedlm(string("./",subdir,"/x0_",iter),x,",")
-# end
-# function write_x1(subdir,iter,x)
-#     @printf("writing x to ./%s/x1_%d \n",subdir,iter)
-#     run(`mkdir -p ./$subdir`)
-#     writedlm(string("./",subdir,"/x1_",iter),x,",")
-# end
 
 type StructJuMPModel <: ModelInterface
     internalModel::JuMP.Model
@@ -77,6 +62,7 @@ type StructJuMPModel <: ModelInterface
             Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}()
             # ,prof,0,0,0,0,0,0,0,0,0
             )
+        
         init_constraints_idx_map(model,instance.id_con_idx_map)
         
         instance.get_num_scen = function()
@@ -89,10 +75,10 @@ type StructJuMPModel <: ModelInterface
             return instance.status
         end
         instance.get_num_rows = function(id::Integer)
-            return get_numcons(instance.internalModel,id)
+            return getNumCons(instance.internalModel,id)
         end
         instance.get_num_cols = function(id::Integer)
-            return get_numvars(instance.internalModel,id)
+            return getNumVars(instance.internalModel,id)
         end
         instance.get_num_eq_cons = function(id::Integer)
             return length(instance.id_con_idx_map[id][1])
@@ -110,9 +96,9 @@ type StructJuMPModel <: ModelInterface
 
 
         instance.str_init_x0 = function(id,x0)
-            assert(id in getScenarioIds(instance.internalModel))
-            mm = get_model(instance.internalModel,id)
-            nvar = get_numvars(instance.internalModel,id)
+            assert(id in getLocalBlocksIds(instance.internalModel))
+            mm = getModel(instance.internalModel,id)
+            nvar = getNumVars(instance.internalModel,id)
             @assert length(x0) == nvar
             
             for i=1:nvar
@@ -125,14 +111,14 @@ type StructJuMPModel <: ModelInterface
         instance.str_prob_info = function(id,mode,clb,cub,rlb,rub)
             # @show id
             if mode == :Structure
-                nn = get_numvars(instance.internalModel,id)
-                mm = get_numcons(instance.internalModel,id)
+                nn = getNumVars(instance.internalModel,id)
+                mm = getNumCons(instance.internalModel,id)
                 # @show nn,mm
                 return (nn,mm)
             elseif mode == :Values
                 # @show length(clb),length(cub)
-                mm = get_model(instance.internalModel,id)
-                nvar = get_numvars(instance.internalModel,id)
+                mm = getModel(instance.internalModel,id)
+                nvar = getNumVars(instance.internalModel,id)
                 @assert length(clb) == nvar 
                 @assert length(cub) == nvar
                 array_copy(mm.colUpper, 1, cub, 1, nvar)
@@ -176,7 +162,7 @@ type StructJuMPModel <: ModelInterface
             # x0, x1 = load_x("pips", instance.n_iter)
 
             e = get_nlp_evaluator(instance.internalModel,id)
-            g = Vector{Float64}(get_numcons(instance.internalModel,id))
+            g = Vector{Float64}(getNumCons(instance.internalModel,id))
             MathProgBase.eval_g(e,g,build_x(instance.internalModel,id,x0,x1))
             (eq_idx, ieq_idx) = instance.id_con_idx_map[id]
             @assert length(new_eq_g) == length(eq_idx)
@@ -203,8 +189,8 @@ type StructJuMPModel <: ModelInterface
             x = build_x(instance.internalModel,rowid,x0,x1)
             g = Vector{Float64}(length(x))
             MathProgBase.eval_grad_f(e,g,x)
-            @assert length(g) == MathProgBase.numvar(get_model(instance.internalModel,rowid))
-            @assert length(new_grad_f) == get_numvars(instance.internalModel,colid)
+            @assert length(g) == MathProgBase.numvar(getModel(instance.internalModel,rowid))
+            @assert length(new_grad_f) == getNumVars(instance.internalModel,colid)
 
             var_idx_map = get_jac_col_var_idx(instance.internalModel,rowid,colid)
             for i in var_idx_map
@@ -254,10 +240,10 @@ type StructJuMPModel <: ModelInterface
 
                 # @show eq_jac_I
                 # @show eq_jac_J
-                eq_jac = sparse(eq_jac_I,eq_jac_J,ones(Float64,length(eq_jac_I)),length(eq_idx),get_numvars(m,colid))
+                eq_jac = sparse(eq_jac_I,eq_jac_J,ones(Float64,length(eq_jac_I)),length(eq_idx),getNumVars(m,colid))
                 # @show ieq_jac_I
                 # @show ieq_jac_J
-                ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ones(Float64,length(ieq_jac_I)),length(ieq_idx),get_numvars(m,colid))
+                ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ones(Float64,length(ieq_jac_I)),length(ieq_idx),getNumVars(m,colid))
                 # @show (length(eq_jac.nzval), length(ieq_jac.nzval))
                 return (length(eq_jac.nzval), length(ieq_jac.nzval))
             elseif(mode == :Values)
@@ -294,8 +280,8 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(eq_jac_g) != 0)
-                    eq_jac = sparse(eq_jac_I,eq_jac_J,eq_jac_g, length(eq_idx),get_numvars(m,colid), keepzeros=true)
-                    # @printf("em=%d; en=%d;\n", length(eq_idx), get_numvars(m,colid))
+                    eq_jac = sparse(eq_jac_I,eq_jac_J,eq_jac_g, length(eq_idx),getNumVars(m,colid), keepzeros=true)
+                    # @printf("em=%d; en=%d;\n", length(eq_idx), getNumVars(m,colid))
                     # @show eq_jac_I, eq_jac_J, eq_jac_g
                     # @printf("ejac%d%d=sparse(eq_jac_I,eq_jac_J,eq_jac_g,em,en); \n",rowid,colid)
                 
@@ -311,8 +297,8 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(ieq_jac_g) != 0)
-                    ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g, length(ieq_idx),get_numvars(m,colid), keepzeros=true)
-                    # @printf("im=%d; in=%d;\n", length(ieq_idx), get_numvars(m,colid))
+                    ieq_jac = sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g, length(ieq_idx),getNumVars(m,colid), keepzeros=true)
+                    # @printf("im=%d; in=%d;\n", length(ieq_idx), getNumVars(m,colid))
                     # @show ieq_jac_I, ieq_jac_J, ieq_jac_g
                     # @printf("ijac%d%d=sparse(ieq_jac_I,ieq_jac_J,ieq_jac_g,im,in); \n",rowid,colid)
                     # @printf("jac%d%d=vcat(ejac%d%d,ijac%d%d) \n",rowid,colid,rowid,colid,rowid,colid)
@@ -442,12 +428,12 @@ type StructJuMPModel <: ModelInterface
                     if (rowid !=0 && colid == 0) #root contribution
                         (h0_J,h0_I) = MathProgBase.hesslag_structure(get_nlp_evaluator(m,0))
                         # @show h0_I,h0_J
-                        str_laghess = sparse([new_h_I;h0_I], [new_h_J;h0_J], [new_h;zeros(Float64,length(h0_I))], get_numvars(m,0),get_numvars(m,0), keepzeros=true)
+                        str_laghess = sparse([new_h_I;h0_I], [new_h_J;h0_J], [new_h;zeros(Float64,length(h0_I))], getNumVars(m,0),getNumVars(m,0), keepzeros=true)
                         
                         new_h_I = [new_h_I;h0_I]
                         new_h_J = [new_h_J;h0_J]
                         new_h = [new_h;zeros(Float64,length(h0_I))]
-                        # @printf("m=%d; n=%d; \n",get_numvars(m,0),get_numvars(m,0))
+                        # @printf("m=%d; n=%d; \n",getNumVars(m,0),getNumVars(m,0))
                         # @show new_h_I, new_h_J, new_h
                         # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
@@ -456,9 +442,9 @@ type StructJuMPModel <: ModelInterface
                         array_copy(str_laghess.nzval, 1,values,1,length(str_laghess.nzval)) 
                     else
                         @assert rowid == colid
-                        str_laghess = sparse(new_h_I,new_h_J,new_h,get_numvars(m,rowid),get_numvars(m,rowid),keepzeros = true)   
+                        str_laghess = sparse(new_h_I,new_h_J,new_h,getNumVars(m,rowid),getNumVars(m,rowid),keepzeros = true)   
                         
-                        # @printf("m=%d;n=%d; \n",get_numvars(m,rowid),get_numvars(m,rowid))
+                        # @printf("m=%d;n=%d; \n",getNumVars(m,rowid),getNumVars(m,rowid))
                         # @show new_h_I, new_h_J, new_h 
                         # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)                   
                         
@@ -492,9 +478,9 @@ type StructJuMPModel <: ModelInterface
                         end
                     end
                     
-                    str_laghess = sparse(new_h_I,new_h_J, new_h, get_numvars(m,colid), get_numvars(m,rowid), keepzeros =true)
+                    str_laghess = sparse(new_h_I,new_h_J, new_h, getNumVars(m,colid), getNumVars(m,rowid), keepzeros =true)
                     
-                    # @printf("m=%d; n=%d; \n", get_numvars(m,colid), get_numvars(m,rowid))
+                    # @printf("m=%d; n=%d; \n", getNumVars(m,colid), getNumVars(m,rowid))
                     # @show new_h_I, new_h_J, new_h
                     # @printf(" hess%d%d=sparse(new_h_I,new_h_J,new_h, m, n); \n",rowid,colid)
 
@@ -520,13 +506,13 @@ type StructJuMPModel <: ModelInterface
         
         instance.str_write_solution = function(id, x, y_eq, y_ieq)
             # @show id, x, y_eq, y_ieq
-            @assert id in getScenarioIds(instance.internalModel)
+            @assert id in getLocalBlocksIds(instance.internalModel)
             @assert length(x) == instance.get_num_cols(id)
             @assert length(y_eq) == instance.get_num_eq_cons(id)
             @assert length(y_ieq) == instance.get_num_ineq_cons(id)
 
             #write back the primal to JuMP
-            mm = get_model(instance.internalModel,id)
+            mm = getModel(instance.internalModel,id)
             for i = 1:length(x)
                 setvalue(Variable(mm,i), x[i])
             end
@@ -549,11 +535,13 @@ end
 #     return t_model_time
 # end
 
+
+
+
+
 #######
 # Linking with PIPS Julia Structure interface
 ######
-
-# setsolverhook(model,structJuMPSolve)
 
 function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs...)
     # @show "solve"
@@ -570,7 +558,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     if with_prof
         tic()
     end    
-    prob = ParPipsNlp.createProblemStruct(comm, StructJuMPModel(model), with_prof)
+    prob = PipsNlpSolver.createProblemStruct(comm, StructJuMPModel(model), with_prof)
 
     if with_prof
         t_sj_model_init += toq()
@@ -582,14 +570,13 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     if with_prof
         tic()
     end
-    status = ParPipsNlp.solveProblemStruct(prob)
+    status = PipsNlpSolver.solveProblemStruct(prob)
     
     if with_prof
         t_sj_solver_total += toq()
     end
 
-    freeProblemStruct(prob)
-    
+
     if with_prof
         t_sj_lifetime += toq()
     end
@@ -619,12 +606,109 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         n2 = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".c.txt")
         run(`mv $n1 $n2`)
     end
-    MPI.Finalize()
-
+    # MPI.Finalize()
     return status
 end
 
-KnownSolvers["ParPips"] = ParPipsNlpInterface.structJuMPSolve
+# function load_x(subdir,iter)
+#     @printf("load x from ./%s/x%d \n",subdir,iter)
+#     x = readdlm(string("./",subdir,"/x",iter))
+#     x0 = x[1:78]
+#     x1 = x[79:144]
+#     return x0, x1
+# end
+
+# function write_x0(subdir,iter,x)
+#     @printf("writing x to ./%s/x0_%d \n",subdir,iter)
+#     run(`mkdir -p ./$subdir`)
+#     writedlm(string("./",subdir,"/x0_",iter),x,",")
+# end
+# function write_x1(subdir,iter,x)
+#     @printf("writing x to ./%s/x1_%d \n",subdir,iter)
+#     run(`mkdir -p ./$subdir`)
+#     writedlm(string("./",subdir,"/x1_",iter),x,",")
+# end
+
+function init_constraints_idx_map(m,map)
+    assert(length(map) == 0)
+    for id in getLocalBlocksIds(m)
+        e = get_nlp_evaluator(m,id) #initialize the nlp evaluator
+        eq_idx = Dict{Int,Int}()
+        ieq_idx = Dict{Int,Int}()
+        push!(map,id=>Pair(eq_idx,ieq_idx))
+        lb,ub=JuMP.constraintbounds(getModel(m,id))
+
+        for i =1:length(lb)
+            if lb[i] == ub[i]
+                eq_idx[i] = length(eq_idx) + 1
+            else
+                ieq_idx[i] =length(ieq_idx) + 1 #remember to offset length(eq_idx)
+            end
+        end
+    end
+end
+
+function get_jac_col_var_idx(m,rowid, colid)  #this method customerized for no linking constraint presented
+    # @show "get_jac_col_var_idx",rowid,colid
+    idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
+    if rowid == colid
+        nvar = getNumVars(m,rowid)
+        for i = 1:nvar
+            idx_map[i] = i
+        end
+    else
+        @assert rowid!=0 && rowid != colid
+        mm = getModel(m,rowid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            idx_map[cidx] = pidx
+        end
+    end
+    # @show idx_map
+    return idx_map
+end
+
+function get_h_var_idx(m,rowid, colid)
+    # @show "get_h_var_idx",rowid,colid
+    col_idx_map = Dict{Int,Int}() #dummy (jump) -> actual used
+    row_idx_map = Dict{Int,Int}()
+    if rowid == colid
+        nvar = getNumVars(m,rowid) #need to place model variable in front of non model variable.
+        for i = 1:nvar
+            col_idx_map[i] = i
+            row_idx_map[i] = i
+        end
+    elseif rowid == 0  && colid != 0 #border
+        mm = getModel(m,colid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            col_idx_map[cidx] = pidx
+        end
+        for i = 1:getNumVars(m,colid)
+            row_idx_map[i] = i
+        end
+    elseif colid == 0 && rowid != 0 #root contrib.
+        mm = getModel(m,rowid)
+        othermap = getStructure(mm).othermap
+        for p in othermap
+            pidx = p[1].col
+            cidx = p[2].col
+            col_idx_map[cidx] = pidx
+            row_idx_map[cidx] = pidx
+        end
+    else
+        @assert false rowid colid
+    end
+    # @show col_idx_map,row_idx_map
+    return col_idx_map,row_idx_map
+end
+
+
+KnownSolvers["PipsNlp"] = PipsNlpInterface.structJuMPSolve
 
 end
 
