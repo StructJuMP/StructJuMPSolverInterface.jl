@@ -22,6 +22,14 @@ catch
 end
 
 #######################
+ApplicationReturnStatus = Dict{Int, Symbol}(
+    0=>:SUCCESSFUL_TERMINATION,
+    1=>:NOT_FINISHED,
+    2=>:MAX_ITS_EXCEEDED,
+    3=>:INFEASIBLE,
+    4=>:NEED_FEASIBILITY_RESTORATION,
+    5=>:UNKNOWN
+    )
 
 type FakeModel <: ModelInterface
     sense::Symbol
@@ -573,7 +581,7 @@ function solveProblemStruct(prob::PipsNlpProblemStruct)
     ret = ccall(Libdl.dlsym(libparpipsnlp,:PipsNlpSolveStruct), Cint, 
             (Ptr{Void},),
             prob.ref)
-    
+    @show ret
     prob.model.set_status(Int(ret))
 
     prob.t_jl_eval_total = report_total_now(prob)

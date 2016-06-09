@@ -10,7 +10,7 @@ import MPI
 abstract ModelInterface
 
 export ModelInterface, KnownSolvers, sj_solve, getModel, getVarValue, getVarValues, getNumVars, 
-        getNumCons, getTotalNumVars, getTotalNumCons, getLocalScenarioIds, getLocalChildrenIds,
+        getNumCons, getTotalNumVars, getTotalNumCons, getLocalBlocksIds, getLocalChildrenIds,
         getObjectiveVal
 
 const KnownSolvers = Dict{AbstractString,Function}();
@@ -126,7 +126,7 @@ function getTotalNumCons(m)
     return ncon
 end
 
-function getLocalScenarioIds(m)
+function getLocalBlocksIds(m)
   myrank,mysize = getMyRank()
   numScens = num_scenarios(m)
   d = div(numScens,mysize)

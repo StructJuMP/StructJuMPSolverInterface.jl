@@ -96,7 +96,7 @@ type StructJuMPModel <: ModelInterface
 
 
         instance.str_init_x0 = function(id,x0)
-            assert(id in getLocalScenarioIds(instance.internalModel))
+            assert(id in getLocalBlocksIds(instance.internalModel))
             mm = getModel(instance.internalModel,id)
             nvar = getNumVars(instance.internalModel,id)
             @assert length(x0) == nvar
@@ -506,7 +506,7 @@ type StructJuMPModel <: ModelInterface
         
         instance.str_write_solution = function(id, x, y_eq, y_ieq)
             # @show id, x, y_eq, y_ieq
-            @assert id in getLocalScenarioIds(instance.internalModel)
+            @assert id in getLocalBlocksIds(instance.internalModel)
             @assert length(x) == instance.get_num_cols(id)
             @assert length(y_eq) == instance.get_num_eq_cons(id)
             @assert length(y_ieq) == instance.get_num_ineq_cons(id)
@@ -607,7 +607,6 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         run(`mv $n1 $n2`)
     end
     # MPI.Finalize()
-
     return status
 end
 
@@ -632,7 +631,7 @@ end
 
 function init_constraints_idx_map(m,map)
     assert(length(map) == 0)
-    for id in getLocalScenarioIds(m)
+    for id in getLocalBlocksIds(m)
         e = get_nlp_evaluator(m,id) #initialize the nlp evaluator
         eq_idx = Dict{Int,Int}()
         ieq_idx = Dict{Int,Int}()

@@ -48,7 +48,7 @@ solve(m,solver="PipsNlp") #solving using parallel PIPS-NLP solver
 * `getLocalChildrenIds(m)` returns a vector of children scenario IDs residing on the current MPI rank. 
 ```julia
 @show getLocalChildrenIds(m) 
-@show getLocalScenarioIds(m)
+@show getLocalBlocksIds(m)
 ```
 
 * `getModel(m,id)` returns the block with specified by `id`. The root block by default has the ID equals to 0. 
