@@ -3,12 +3,13 @@ StructJuMPSolverInterface
 
 ### StructJuMP's Solver Interface
 
-StructJuMPSolverInterface defines the nonlinear solver interface for [StructJuMP](https://github.com/joehuchette/StructJuMP.jl)--the Structured Modeling Extension for [JuMP](https://github.com/JuliaOpt/JuMP.jl). StructJuMP provides user an easy way to model optimization problems using their inherited block structures. On the other hand, StructJuMPSolverInterface makes it easy for user to solve the structured model that is produced by StructJuMP using solvers that are implementing this interface. 
+StructJuMPSolverInterface defines the nonlinear solver interface for [StructJuMP](https://github.com/joehuchette/StructJuMP.jl)--the Structured Modeling Extension for [JuMP](https://github.com/JuliaOpt/JuMP.jl) and provides glue code for [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/) solvers.
 
+PIPS parallel  interface ("PipsNlp") matches StructJuMP's paralel capabilities. The two offer a truly parallel modeling + solving environment. In addition, PIPS also has a serial interface ("PipsNlpSerial"), which is used mostly for debugging purposes. The Ipopt interface to StructJuMP is also serial.
 
 ### Solver Supports
 
-There are two solvers currently implement this interface. They are [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/). When using PIPS, user can choose either the parallel or serial implementations for solving the structured model. When the parallel solver is selected, the parallel problem allocation and generation are done automatically at the backend, that is also transparent to the user. It enables user to easily adopt the state-of-art parallel solvers and to solve large scale optimization problems which could be too big to allocate on a single node. 
+<!--There are two solvers currently implement this interface. They are [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/). When using PIPS, user can choose either the parallel or serial implementations for solving the structured model. When the parallel solver is selected, the parallel problem allocation and generation are done automatically at the backend, that is also transparent to the user. It enables user to easily adopt the state-of-art parallel solvers and to solve large scale optimization problems which could be too big to allocate on a single node. -->
 
 
 
@@ -37,34 +38,36 @@ for(i in getLocalChildrenIds(m))
 end
 ```
 
-At this point, `m` is a two level model that has a single root node and `3` children. Then the model can be solved by calling `solve` function with a input parameter `solver` that equals to one of the known solvers, `"PipsNlp", "PipsNlpSerial"` or `"Ipopt"`. 
+At this point, `m` is a two level model that has a single root node, or block and `3` children nodes. The model can be solved by calling `solve` function with a parameter `solver` equal to one of the known solvers, `"PipsNlp", "PipsNlpSerial"` or `"Ipopt"`. 
 ```julia
 solve(m,solver="PipsNlp") #solving using parallel PIPS-NLP solver
 ```
 
 ### Exposed API functions
-* `getLocalChildrenIds(m)` returns a vector of children scenario IDs that is allocated on the calling process. `getLocalScenarioIds(m)` returns a vector of scenario IDs that is allocated in the calling process (include the root node).  
+* `getLocalBlocksIds(m)` returns a vector of block IDs residing on the current MPI rank.   
+* `getLocalChildrenIds(m)` returns a vector of children scenario IDs residing on the current MPI rank. 
 ```julia
 @show getLocalChildrenIds(m) 
 @show getLocalScenarioIds(m)
 ```
 
-* `getModel(m,id)` returns the node with scenario ID that equals to `id`. The root node by default has the ID equals to 0. 
+* `getModel(m,id)` returns the block with specified by `id`. The root block by default has the ID equals to 0. 
 ```julia
 mm = getModel(m,1) # mm is now the 1st scenario node.
 ```
 
-* `getVarValues(m,id)` returns the variable values in a vector for the node with ID that equals to `id`.
+* `getVarValues(m,id)` returns the variable values vector for block `id`.
 ```julia
 v = getVarValues(m,1) # v is holding the variable values of 1st scenario.
 ```
 
-* `getVarValue(m,id,var_idx)` returns a single variable value indexed by `var_idx` in the node with ID that equals to `id`.
+* `getVarValue(m,id,var_idx)` returns value of the variable indexed by `var_idx` in the block `id`.
 ```julia
-a = getVarValue(m,1,2) #a is the 2nd variable value of 1st scenario. 
+a = getVarValue(m,1,2) #a is the 2nd variable value of block id # 1. 
 ```
 
-* `getNumVars` and `getNumCons` returns the number of variables and cnstraints correspondingly for a node with scenario ID that euqals to `id`.  `getTotalNumVars` and `getTotalNumCons` return the total number of variables and constraints by summing over every nodes.  
+* `getNumVars` and `getNumCons` return the number of variables and constraints of block `id`.  
+* `getTotalNumVars` and `getTotalNumCons` return the total number of variables and constraints of the problem. The parameter `m` needs to point to the root block.
 ```julia
 @show getNumVars(m,id)
 @show getNumCons(m,id)
@@ -72,14 +75,13 @@ a = getVarValue(m,1,2) #a is the 2nd variable value of 1st scenario.
 @show getTotalNumCons(m)
 ```
 
-* `getObjectiveVal` returns the objective function value. 
+* `getObjectiveVal` returns the value of objective.
 ```julia
 @show getObjectiveVal(m)
 ```
 
 ### Known Limitation 
-* Variables in sub-problem are assummed to be declared before the constraint declarations. 
-* At this time, the exposed API functions are for serial solvers only. That is they computes the scenarios that are allocated on a local process. The API functions for enquiring model in a parallel allocation will be realsed shortly. 
+* Variables in the structural blocks needs to be declared before the constraint declarations. 
 
 <!-- [![Build Status](https://travis-ci.org/fqiang/SolverInterface.jl.svg?branch=master)](https://travis-ci.org/fqiang/SolverInterface.jl)
 -->
