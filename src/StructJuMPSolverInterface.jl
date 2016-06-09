@@ -14,11 +14,34 @@ export ModelInterface, KnownSolvers, sj_solve, getModel, getVarValue, getVarValu
         getObjectiveVal
 
 const KnownSolvers = Dict{AbstractString,Function}();
-const SolverStatus = Dict{Int, Symbol}(
-  0=>:Optimal,
-  1=>:Infesible,
-  2=>:Unbounded,
-  3=>:IterationExceeded
+
+# In general we will use same ret code symbol for Ipopt
+# also with added return code for PIPS
+# From Ipopt/src/Interfaces/IpReturnCodes_inc.h
+ApplicationReturnStatus = Dict(
+  0=>:Solve_Succeeded,
+  1=>:Solved_To_Acceptable_Level,
+  2=>:Infeasible_Problem_Detected,
+  3=>:Search_Direction_Becomes_Too_Small,
+  4=>:Diverging_Iterates,
+  5=>:User_Requested_Stop,
+  6=>:Feasible_Point_Found,
+  #for PIPS specific
+  7=>:Need_Feasibility_Restoration,
+  8=>:Unknown,
+  #end for PIPS retcode
+  -1=>:Maximum_Iterations_Exceeded,
+  -2=>:Restoration_Failed,
+  -3=>:Error_In_Step_Computation,
+  -4=>:Maximum_CpuTime_Exceeded,
+  -10=>:Not_Enough_Degrees_Of_Freedom,
+  -11=>:Invalid_Problem_Definition,
+  -12=>:Invalid_Option,
+  -13=>:Invalid_Number_Detected,
+  -100=>:Unrecoverable_Exception,
+  -101=>:NonIpopt_Exception_Thrown,
+  -102=>:Insufficient_Memory,
+  -199=>:Internal_Error
   )
 
 function sj_solve(model; solver="Unknown", with_prof=false, suppress_warmings=false,kwargs...)
@@ -28,18 +51,14 @@ function sj_solve(model; solver="Unknown", with_prof=false, suppress_warmings=fa
     end
     status = KnownSolvers[solver](model; with_prof=with_prof, suppress_warmings=false,kwargs...)
     
-    if !haskey(SolverStatus,status)
+    if !haskey(ApplicationReturnStatus,status)
       Base.warn("solver can't solve the problem");
       return :Error
     else
-      return SolverStatus[status]
+      # @show ApplicationReturnStatus[status]
+      return ApplicationReturnStatus[status]
     end
-    # @show getLocalChildrenIds(m)
-
-    MPI.Finalize()
 end
-
-
 
 # package code goes here
 include("helper.jl")

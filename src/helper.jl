@@ -5,6 +5,25 @@ import MathProgBase
 
 export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @declare_second_stage, message
 export strip_x, build_x
+export PIPSRetCodeToSolverInterfaceCode
+
+const PIPSRetCode = Dict{Int, Symbol}(
+    0=>:SUCCESSFUL_TERMINATION,
+    1=>:NOT_FINISHED,
+    2=>:MAX_ITS_EXCEEDED,
+    3=>:INFEASIBLE,
+    4=>:NEED_FEASIBILITY_RESTORATION,
+    5=>:UNKNOWN
+    )
+
+const PIPSRetCodeToSolverInterfaceCode = Dict{Int, Int}(
+    0=>0,
+    1=>8,
+    2=>-1,
+    3=>2,
+    4=>7,
+    5=>8
+    )
 
 function strip_x(m,id,x,start_idx)
     mm = getModel(m,id)

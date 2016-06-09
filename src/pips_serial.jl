@@ -368,7 +368,7 @@ function structJuMPSolve(model; suppress_warmings=false,kwargs...)
     status = solveProblem(prob)
     nm.write_solution(prob.x)
     
-    return status
+    return PIPSRetCodeToSolverInterfaceCode[status]
 end
 
 KnownSolvers["PipsNlpSerial"] = PipsNlpInterfaceSerial.structJuMPSolve

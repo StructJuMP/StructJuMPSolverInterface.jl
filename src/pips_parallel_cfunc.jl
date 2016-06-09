@@ -22,15 +22,6 @@ catch
 end
 
 #######################
-ApplicationReturnStatus = Dict{Int, Symbol}(
-    0=>:SUCCESSFUL_TERMINATION,
-    1=>:NOT_FINISHED,
-    2=>:MAX_ITS_EXCEEDED,
-    3=>:INFEASIBLE,
-    4=>:NEED_FEASIBILITY_RESTORATION,
-    5=>:UNKNOWN
-    )
-
 type FakeModel <: ModelInterface
     sense::Symbol
     status::Int
@@ -526,6 +517,7 @@ end
 ###########################################################################
 # C function wrappers
 ###########################################################################
+
 function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
 	# println(" createProblemStruct  -- julia")
 	str_init_x0_cb = cfunction(str_init_x0_wrapper, Cint, (Ptr{Float64}, Ptr{CallBackData}) )
@@ -547,7 +539,8 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             (MPI.Comm, 
             Cint, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
-	    Ptr{Void}, Ptr{Void}, Ptr{Void} ,Any
+	    Ptr{Void}, Ptr{Void}, Ptr{Void},Any
+            ,Ptr{Void}, Ptr{Void}  #comply with link interface from yankai
             ),
             comm, 
             model.get_num_scen(),
@@ -559,7 +552,8 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             str_eval_jac_g_cb, 
             str_eval_h_cb,
             str_write_solution_cb,
-            prob
+            prob,
+            Ptr{Void}(0), Ptr{Void}(0)
             )
     # println(" ccall CreatePipsNlpProblemStruct done ")
     # @show ret   
@@ -581,7 +575,7 @@ function solveProblemStruct(prob::PipsNlpProblemStruct)
     ret = ccall(Libdl.dlsym(libparpipsnlp,:PipsNlpSolveStruct), Cint, 
             (Ptr{Void},),
             prob.ref)
-    @show ret
+    # @show ret
     prob.model.set_status(Int(ret))
 
     prob.t_jl_eval_total = report_total_now(prob)
@@ -595,6 +589,9 @@ function freeProblemStruct(prob::PipsNlpProblemStruct)
             Void, (Ptr{Void},),
             prob.ref)
     # @show ret
+    if isdefined(:MPI) == true && MPI.Initialized() && !MPI.Finalized()
+        MPI.Finalize()
+    end
     return ret
 end
 

@@ -607,7 +607,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         run(`mv $n1 $n2`)
     end
     # MPI.Finalize()
-    return status
+    return PIPSRetCodeToSolverInterfaceCode[status]
 end
 
 # function load_x(subdir,iter)
