@@ -589,9 +589,6 @@ function freeProblemStruct(prob::PipsNlpProblemStruct)
             Void, (Ptr{Void},),
             prob.ref)
     # @show ret
-    if isdefined(:MPI) == true && MPI.Initialized() && !MPI.Finalized()
-        MPI.Finalize()
-    end
     return ret
 end
 
