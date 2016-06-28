@@ -51,6 +51,14 @@ function sj_solve(model; solver="Unknown", with_prof=false, suppress_warmings=fa
     end
     status = KnownSolvers[solver](model; with_prof=with_prof, suppress_warmings=false,kwargs...)
     
+    userInitMPI = getStructure(model).userInitMPI
+    if !userInitMPI
+      # @show "not user mpi"
+      if isdefined(:MPI) == true && MPI.Initialized() && !MPI.Finalized()
+          MPI.Finalize()
+      end
+    end
+
     if !haskey(ApplicationReturnStatus,status)
       Base.warn("solver can't solve the problem");
       return :Error

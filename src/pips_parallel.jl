@@ -606,7 +606,6 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         n2 = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".c.txt")
         run(`mv $n1 $n2`)
     end
-    # MPI.Finalize()
     return PIPSRetCodeToSolverInterfaceCode[status]
 end
 
