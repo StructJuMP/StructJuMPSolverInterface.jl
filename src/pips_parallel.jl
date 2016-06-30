@@ -38,6 +38,8 @@ type StructJuMPModel <: ModelInterface
     get_num_cols::Function
     get_num_eq_cons::Function
     get_num_ineq_cons::Function
+    get_num_eq_lcons::Function
+    get_num_ineq_lcons::Function
 
     set_status::Function
     
@@ -86,6 +88,12 @@ type StructJuMPModel <: ModelInterface
         instance.get_num_ineq_cons = function(id::Integer)
             return length(instance.id_con_idx_map[id][2])
         end
+        instance.get_num_eq_lcons = function()
+            return 0
+        end
+        instance.get_num_ineq_lcons = function()
+            return 0
+        end
         instance.set_status = function(s::Integer)
             instance.status = s
         end
@@ -108,37 +116,49 @@ type StructJuMPModel <: ModelInterface
             # @show x0;
         end  
 
-        instance.str_prob_info = function(id,mode,clb,cub,rlb,rub)
+        instance.str_prob_info = function(id,flag,mode,clb,cub,rlb,rub)
             # @show id
             if mode == :Structure
-                nn = getNumVars(instance.internalModel,id)
-                mm = getNumCons(instance.internalModel,id)
+                if flag == 0
+                    nn = getNumVars(instance.internalModel,id)
+                    mm = getNumCons(instance.internalModel,id)
+                else 
+                    @assert flag == 1
+                    nn = getNumVars(instance.internalModel,id)
+                    # mm = getNumLinkCons() #TODO: this is not yet supported
+                    mm = 0
+                end
                 # @show nn,mm
                 return (nn,mm)
             elseif mode == :Values
-                # @show length(clb),length(cub)
-                mm = getModel(instance.internalModel,id)
-                nvar = getNumVars(instance.internalModel,id)
-                @assert length(clb) == nvar 
-                @assert length(cub) == nvar
-                array_copy(mm.colUpper, 1, cub, 1, nvar)
-                array_copy(mm.colLower, 1, clb, 1, nvar)
-                lb,ub = JuMP.constraintbounds(mm)
-                # @show lb, ub
-                (eq_idx, ieq_idx) = instance.id_con_idx_map[id]
-                # @show eq_idx,ieq_idx
-                @assert length(lb) == length(ub)
-                @assert length(eq_idx) + length(ieq_idx) == length(lb)
-                num_eq = length(eq_idx)
-                for i in eq_idx
-                    rlb[i[2]] = lb[i[1]]
-                    rub[i[2]] = ub[i[1]]
+                if flag == 0
+                    # @show length(clb),length(cub)
+                    mm = getModel(instance.internalModel,id)
+                    nvar = getNumVars(instance.internalModel,id)
+                    @assert length(clb) == nvar 
+                    @assert length(cub) == nvar
+                    array_copy(mm.colUpper, 1, cub, 1, nvar)
+                    array_copy(mm.colLower, 1, clb, 1, nvar)
+                    lb,ub = JuMP.constraintbounds(mm)
+                    # @show lb, ub
+                    (eq_idx, ieq_idx) = instance.id_con_idx_map[id]
+                    # @show eq_idx,ieq_idx
+                    @assert length(lb) == length(ub)
+                    @assert length(eq_idx) + length(ieq_idx) == length(lb)
+                    num_eq = length(eq_idx)
+                    for i in eq_idx
+                        rlb[i[2]] = lb[i[1]]
+                        rub[i[2]] = ub[i[1]]
+                    end
+                    for i in ieq_idx
+                        rlb[i[2]+num_eq] = lb[i[1]]
+                        rub[i[2]+num_eq] = ub[i[1]]
+                    end
+                    # @show id, rlb, rub
+                else
+                    @assert flag == 1
+                    @assert length(rlb) == length(rub) == 0 #TODO: not yet support linking constraints syntax
                 end
-                for i in ieq_idx
-                    rlb[i[2]+num_eq] = lb[i[1]]
-                    rub[i[2]+num_eq] = ub[i[1]]
-                end
-                # @show id, rlb, rub
             else
                 @assert false mode
             end

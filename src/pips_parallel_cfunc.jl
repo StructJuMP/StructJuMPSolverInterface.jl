@@ -154,6 +154,7 @@ immutable CallBackData
 	prob::Ptr{Void}
 	row_node_id::Cint
     col_node_id::Cint
+    flag::Cint  #this wrapper ignore this flag as it is only for problems without linking constraint 
 end
 
 export  ModelInterface, FakeModel,
@@ -194,7 +195,7 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     # @show " julia - str_prob_info_wrapper "
     # @show cbd
     data = unsafe_load(cbd)
-    # @show data
+    @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
     # @show prob
@@ -202,56 +203,76 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     # out = Array(Ptr{CallBackData},1)
     rowid = data.row_node_id
     colid = data.col_node_id
+    flag = data.flag
     assert(rowid == colid)
 	
 	mode = (col_lb_ptr == C_NULL) ? (:Structure) : (:Values)
-	if(mode==:Structure)
-		col_lb = pointer_to_array(col_lb_ptr,0)
-		col_ub = pointer_to_array(col_ub_ptr,0)
-		row_lb = pointer_to_array(row_lb_ptr,0)
-		row_ub = pointer_to_array(row_ub_ptr,0)
-        if prob.prof
-            tic()
-        end
-		(n,m) = prob.model.str_prob_info(colid,mode,col_lb,col_ub,row_lb,row_ub)
-        if prob.prof
-            prob.t_jl_str_prob_info += toq()
-        end
+    @show flag
+    if flag == 0
+        @show mode
+    	if(mode==:Structure)
+            col_lb = pointer_to_array(col_lb_ptr,0)
+    		col_ub = pointer_to_array(col_ub_ptr,0)
+    		row_lb = pointer_to_array(row_lb_ptr,0)
+    		row_ub = pointer_to_array(row_ub_ptr,0)
+            if prob.prof
+                tic()
+            end
+    		(n,m) = prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
+            if prob.prof
+                prob.t_jl_str_prob_info += toq()
+            end
 
-		unsafe_store!(n_ptr,convert(Cint,n)::Cint)
-		unsafe_store!(m_ptr,convert(Cint,m)::Cint)
-        # @show typeof(colid), typeof(m)
-		prob.model.set_num_rows(colid, m)
-		prob.model.set_num_cols(colid, n)
-	else
-		n = unsafe_load(n_ptr)
-		m = unsafe_load(m_ptr)
-		col_lb = pointer_to_array(col_lb_ptr,n)
-		col_ub = pointer_to_array(col_ub_ptr,n)
-		row_lb = pointer_to_array(row_lb_ptr,m)
-		row_ub = pointer_to_array(row_ub_ptr,m)
+    		unsafe_store!(n_ptr,convert(Cint,n)::Cint)
+    		unsafe_store!(m_ptr,convert(Cint,m)::Cint)
+            # @show typeof(colid), typeof(m)
+    		prob.model.set_num_rows(colid, m)
+    		prob.model.set_num_cols(colid, n)
+    	else
+    		n = unsafe_load(n_ptr)
+    		m = unsafe_load(m_ptr)
+    		col_lb = pointer_to_array(col_lb_ptr,n)
+    		col_ub = pointer_to_array(col_ub_ptr,n)
+    		row_lb = pointer_to_array(row_lb_ptr,m)
+    		row_ub = pointer_to_array(row_ub_ptr,m)
 
-        if prob.prof
-            tic()
-        end
-		prob.model.str_prob_info(colid,mode,col_lb,col_ub,row_lb,row_ub)
-        if prob.prof
-            prob.t_jl_str_prob_info += toq()
-        end
+            if prob.prof
+                tic()
+            end
+    		prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
+            if prob.prof
+                prob.t_jl_str_prob_info += toq()
+            end
 
-		neq = 0
-		nineq = 0
-		for i = 1:length(row_lb)
-			if row_lb[i] == row_ub[i]
-				neq += 1
-			else
-				nineq += 1
-			end
-		end
-		assert(neq+nineq == length(row_lb) == m)
-		prob.model.set_num_eq_cons(colid,neq)
-		prob.model.set_num_ineq_cons(colid,nineq) 
-	end
+    		neq = 0
+    		nineq = 0
+    		for i = 1:length(row_lb)
+    			if row_lb[i] == row_ub[i]
+    				neq += 1
+    			else
+    				nineq += 1
+    			end
+    		end
+    		assert(neq+nineq == length(row_lb) == m)
+    		prob.model.set_num_eq_cons(colid,neq)
+    		prob.model.set_num_ineq_cons(colid,nineq) 
+    	end
+    else
+        @assert flag ==1
+        if mode == :Structure
+            col_lb = pointer_to_array(col_lb_ptr,0)
+            col_ub = pointer_to_array(col_ub_ptr,0)
+            row_lb = pointer_to_array(row_lb_ptr,0)
+            row_ub = pointer_to_array(row_ub_ptr,0)
+            (n,m) = prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
+            # @show n,m
+            unsafe_store!(m_ptr,convert(Cint,m)::Cint)
+        else
+            n = unsafe_load(n_ptr)
+            m = unsafe_load(m_ptr)
+            @assert m==0
+        end
+    end
 	return Int32(1)
 end
 # Objective (eval_f)
@@ -363,6 +384,7 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
     rowid = data.row_node_id
     colid = data.col_node_id
+    flag = data.flag
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(rowid) #we can do this because of 2-level and no linking constraint
     # @show n0, n1 
@@ -375,41 +397,55 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     #@show prob
     # Determine mode
     mode = (e_values_ptr == C_NULL && i_values_ptr == C_NULL) ? (:Structure) : (:Values)
-    if(mode == :Structure)
-    	e_values = pointer_to_array(e_values_ptr,0)
-		e_colptr = pointer_to_array(e_col_ptr,0)
-		e_rowidx = pointer_to_array(e_row_ptr,0)
-		i_values = pointer_to_array(i_values_ptr,0)
-		i_colptr = pointer_to_array(i_col_ptr,0)
-		i_rowidx = pointer_to_array(i_row_ptr,0)
-        if prob.prof
-            tic()
+    if flag == 0
+        if(mode == :Structure)
+        	e_values = pointer_to_array(e_values_ptr,0)
+    		e_colptr = pointer_to_array(e_col_ptr,0)
+    		e_rowidx = pointer_to_array(e_row_ptr,0)
+    		i_values = pointer_to_array(i_values_ptr,0)
+    		i_colptr = pointer_to_array(i_col_ptr,0)
+    		i_rowidx = pointer_to_array(i_row_ptr,0)
+            if prob.prof
+                tic()
+            end
+            (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
+            if prob.prof
+                prob.t_jl_str_eval_jac_g += toq()
+            end
+    		unsafe_store!(e_nz_ptr,convert(Cint,e_nz)::Cint)
+    		unsafe_store!(i_nz_ptr,convert(Cint,i_nz)::Cint)
+    		# @show "structure - ",(e_nz,i_nz)
+        else
+        	e_nz = unsafe_load(e_nz_ptr)
+        	e_values = pointer_to_array(e_values_ptr,e_nz)
+        	e_rowidx = pointer_to_array(e_row_ptr, e_nz)
+        	e_colptr = pointer_to_array(e_col_ptr, ncol+1)
+        	i_nz = unsafe_load(i_nz_ptr)
+        	# @show "values - ",(e_nz,i_nz), ncol
+        	i_values = pointer_to_array(i_values_ptr,i_nz)
+        	i_rowidx = pointer_to_array(i_row_ptr, i_nz)
+        	i_colptr = pointer_to_array(i_col_ptr, ncol+1)
+            # @show x0
+            # @show x1 
+            if prob.prof
+                tic()
+            end
+        	prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
+            if prob.prof
+                prob.t_jl_eval_jac_g += toq()
+            end
         end
-        (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
-        if prob.prof
-            prob.t_jl_str_eval_jac_g += toq()
-        end
-		unsafe_store!(e_nz_ptr,convert(Cint,e_nz)::Cint)
-		unsafe_store!(i_nz_ptr,convert(Cint,i_nz)::Cint)
-		# @show "structure - ",(e_nz,i_nz)
     else
-    	e_nz = unsafe_load(e_nz_ptr)
-    	e_values = pointer_to_array(e_values_ptr,e_nz)
-    	e_rowidx = pointer_to_array(e_row_ptr, e_nz)
-    	e_colptr = pointer_to_array(e_col_ptr, ncol+1)
-    	i_nz = unsafe_load(i_nz_ptr)
-    	# @show "values - ",(e_nz,i_nz), ncol
-    	i_values = pointer_to_array(i_values_ptr,i_nz)
-    	i_rowidx = pointer_to_array(i_row_ptr, i_nz)
-    	i_colptr = pointer_to_array(i_col_ptr, ncol+1)
-        # @show x0
-        # @show x1 
-        if prob.prof
-            tic()
-        end
-    	prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
-        if prob.prof
-            prob.t_jl_eval_jac_g += toq()
+        @assert flag == 1
+        if mode == :Structure
+            e_nz = 0
+            i_nz = 0
+            unsafe_store!(e_nz_ptr,convert(Cint,e_nz)::Cint)
+            unsafe_store!(i_nz_ptr,convert(Cint,i_nz)::Cint)
+        else
+            e_nz = unsafe_load(e_nz_ptr)
+            i_nz = unsafe_load(i_nz_ptr)
+            @assert e_nz == i_nz == 0
         end
     end
     # Done
@@ -540,7 +576,7 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             Cint, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void},Any
-            ,Ptr{Void}, Ptr{Void}  #comply with link interface from yankai
+            # ,Ptr{Void}, Ptr{Void}  #comply with link interface from yankai
             ),
             comm, 
             model.get_num_scen(),
@@ -552,8 +588,8 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             str_eval_jac_g_cb, 
             str_eval_h_cb,
             str_write_solution_cb,
-            prob,
-            Ptr{Void}(0), Ptr{Void}(0)
+            prob
+            # ,Ptr{Void}(0), Ptr{Void}(0)
             )
     # println(" ccall CreatePipsNlpProblemStruct done ")
     # @show ret   
