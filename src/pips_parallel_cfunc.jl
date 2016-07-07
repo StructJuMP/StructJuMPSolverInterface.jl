@@ -195,7 +195,7 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     # @show " julia - str_prob_info_wrapper "
     # @show cbd
     data = unsafe_load(cbd)
-    @show data
+    # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
     # @show prob
@@ -207,9 +207,9 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     assert(rowid == colid)
 	
 	mode = (col_lb_ptr == C_NULL) ? (:Structure) : (:Values)
-    @show flag
+    # @show flag
     if flag == 0
-        @show mode
+        # @show mode
     	if(mode==:Structure)
             col_lb = pointer_to_array(col_lb_ptr,0)
     		col_ub = pointer_to_array(col_ub_ptr,0)

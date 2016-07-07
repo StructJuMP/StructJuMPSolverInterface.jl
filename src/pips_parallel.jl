@@ -571,7 +571,7 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
     end
     # MPI.Init() ＃initialize in model loading
 
-    comm = getStructure(model).comm
+    comm = getStructure(model).mpiWrapper.comm
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
     t_sj_model_init = 0.0
