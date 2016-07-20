@@ -154,7 +154,7 @@ immutable CallBackData
 	prob::Ptr{Void}
 	row_node_id::Cint
     col_node_id::Cint
-    flag::Cint  #this wrapper ignore this flag as it is only for problems without linking constraint 
+    flag::Cint  
 end
 
 export  ModelInterface, FakeModel,
@@ -174,8 +174,8 @@ function str_init_x0_wrapper(x0_ptr::Ptr{Float64}, cbd::Ptr{CallBackData})
     # @show prob
     # data = unsafe_pointer_to_objref(cbd)::CallBackData
     # out = Array(Ptr{CallBackData},1)
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(Int(data.row_node_id))
+    colid = Int(Int(data.col_node_id))
     assert(rowid == colid)
     n0 = prob.model.get_num_cols(colid)
     x0 = pointer_to_array(x0_ptr, n0)
@@ -201,9 +201,9 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     # @show prob
     # data = unsafe_pointer_to_objref(cbd)::CallBackData
     # out = Array(Ptr{CallBackData},1)
-    rowid = data.row_node_id
-    colid = data.col_node_id
-    flag = data.flag
+    rowid = Int(Int(data.row_node_id))
+    colid = Int(data.col_node_id)
+    flag = Int(data.flag)
     assert(rowid == colid)
 	
 	mode = (col_lb_ptr == C_NULL) ? (:Structure) : (:Values)
@@ -283,8 +283,8 @@ function str_eval_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, obj_ptr:
     # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(Int(data.row_node_id))
+    colid = Int(data.col_node_id)
     assert(rowid == colid)
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(colid)
@@ -312,8 +312,8 @@ function str_eval_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, eq_g_ptr
     # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(data.row_node_id)
+    colid = Int(data.col_node_id)
     assert(rowid == colid)
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(colid)
@@ -345,8 +345,8 @@ function str_eval_grad_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, gra
     # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(data.row_node_id)
+    colid = Int(data.col_node_id)
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(rowid)
     # @show n0,n1
@@ -382,9 +382,9 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
-    rowid = data.row_node_id
-    colid = data.col_node_id
-    flag = data.flag
+    rowid = Int(Int(data.row_node_id))
+    colid = Int(Int(data.col_node_id))
+    flag = Int(data.flag)
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(rowid) #we can do this because of 2-level and no linking constraint
     # @show n0, n1 
@@ -396,8 +396,8 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     ncol = prob.model.get_num_cols(colid) 
     #@show prob
     # Determine mode
-    mode = (e_values_ptr == C_NULL && i_values_ptr == C_NULL) ? (:Structure) : (:Values)
-    if flag == 0
+    mode = (e_col_ptr == C_NULL && i_col_ptr == C_NULL) ? (:Structure) : (:Values)
+    if flag != 1
         if(mode == :Structure)
         	e_values = pointer_to_array(e_values_ptr,0)
     		e_colptr = pointer_to_array(e_col_ptr,0)
@@ -408,7 +408,7 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
             if prob.prof
                 tic()
             end
-            (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
+            (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,flag,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
             if prob.prof
                 prob.t_jl_str_eval_jac_g += toq()
             end
@@ -430,7 +430,7 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
             if prob.prof
                 tic()
             end
-        	prob.model.str_eval_jac_g(rowid,colid,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
+        	prob.model.str_eval_jac_g(rowid,colid,flag,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
             if prob.prof
                 prob.t_jl_eval_jac_g += toq()
             end
@@ -461,8 +461,9 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
     # @show prob.prof
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(data.row_node_id)
+    colid = Int(data.col_node_id)
+    flag = Int(data.flag)
     
     high = max(rowid,colid)
     low  = min(rowid,colid)
@@ -482,7 +483,7 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
         obj_factor *= -1.0
     end
     # Did the user specify a Hessian
-    mode = (values_ptr == C_NULL) ? (:Structure) : (:Values)
+    mode = (col_ptr == C_NULL) ? (:Structure) : (:Values)
     if(mode == :Structure)
     	values = pointer_to_array(values_ptr,0)
 		colptr = pointer_to_array(col_ptr,0)
@@ -490,7 +491,7 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
         if prob.prof
             tic()
         end
-		nz = prob.model.str_eval_h(rowid,colid,x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
+		nz = prob.model.str_eval_h(rowid,colid,flag, x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
         if prob.prof
             prob.t_jl_str_eval_h += toq()
         end
@@ -505,7 +506,7 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
         if prob.prof
             tic()
         end
-    	prob.model.str_eval_h(rowid,colid,x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
+    	prob.model.str_eval_h(rowid,colid,flag,x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
         if prob.prof
             prob.t_jl_eval_h += toq()
             # @show prob.t_jl_eval_h
@@ -530,8 +531,8 @@ function str_write_solution_wrapper(x_ptr::Ptr{Float64}, y_eq_ptr::Ptr{Float64},
     # @show data
     userdata = data.prob
     prob = unsafe_pointer_to_objref(userdata)::PipsNlpProblemStruct
-    rowid = data.row_node_id
-    colid = data.col_node_id
+    rowid = Int(data.row_node_id)
+    colid = Int(data.col_node_id)
     @assert rowid == colid
 
     nx = prob.model.get_num_cols(rowid)
@@ -576,7 +577,6 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             Cint, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void},Any
-            # ,Ptr{Void}, Ptr{Void}  #comply with link interface from yankai
             ),
             comm, 
             model.get_num_scen(),
@@ -589,7 +589,6 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
             str_eval_h_cb,
             str_write_solution_cb,
             prob
-            # ,Ptr{Void}(0), Ptr{Void}(0)
             )
     # println(" ccall CreatePipsNlpProblemStruct done ")
     # @show ret   
