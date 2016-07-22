@@ -3,7 +3,8 @@
 using StructJuMP, JuMP
 import MathProgBase
 
-export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x, @declare_second_stage, message
+export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x
+export @declare_second_stage, @timing, @message
 export strip_x, build_x
 export PIPSRetCodeToSolverInterfaceCode
 
@@ -123,9 +124,11 @@ function write_x(subdir,iter,x)
     writedlm(string("./",subdir,"/x",iter),x,",")
 end
 
-function message(s)
-    rank, nprocs = getMyRank()
-    @printf("[%d/%d] [ %s ] \n", rank, nprocs, s)
+macro message(s)
+    return quote
+        rank, nprocs = getMyRank()
+        @printf("[%d/%d] [ %s ] \n", rank, nprocs, $(esc(s)))
+    end
 end
 
 macro declare_second_stage(m,ind,code)
@@ -135,6 +138,14 @@ macro declare_second_stage(m,ind,code)
         for $(esc(ind)) in proc_idx_set
             $(esc(code))
         end
+    end
+end
+
+macro timing(cond,code)
+    return quote
+        if $(esc(cond))
+            $(esc(code))
+       end
     end
 end
 

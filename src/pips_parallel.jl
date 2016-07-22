@@ -211,13 +211,10 @@ type StructJuMPModel <: ModelInterface
             # x0, x1 = load_x("pips", instance.n_iter)
 
             e =  instance.evaluatorMap[id]
-            if instance.prof
-                tic()
-            end
+
+            @timing instance.prof tic()
             obj = MathProgBase.eval_f(e,build_x(instance.internalModel,id,x0,x1))
-            if instance.prof
-                instance.t_jump += toq()
-            end
+            @timing instance.prof instance.t_jump += toq()
             # @show obj
             return obj
 
@@ -225,27 +222,22 @@ type StructJuMPModel <: ModelInterface
 
         instance.str_eval_g = function(id::Int,x0::Vector{Float64},x1::Vector{Float64}, new_eq_g::Vector{Float64}, new_inq_g::Vector{Float64})
             # x0, x1 = load_x("pips", instance.n_iter)
-            if instance.prof
-                tic()
-            end
+            @timing instance.prof tic()
+            
             e = instance.evaluatorMap[id]
             g = Vector{Float64}(getNumCons(instance.internalModel,id))
-            if instance.prof
-                tic()
-            end
+            
+            @timing instance.prof tic()
             MathProgBase.eval_g(e,g,build_x(instance.internalModel,id,x0,x1))
-            if instance.prof
-                instance.t_jump += toq()
-            end
+            @timing instance.prof instance.t_jump += toq()
+            
             p = instance.iMap[id]
             eq_idx = p[1] 
             ieq_idx = p[2] 
             @assert length(new_eq_g) == length(eq_idx)
             @assert length(ieq_idx) == length(new_inq_g)
             
-            if instance.prof
-                tic()
-            end
+            @timing instance.prof tic()
             for i in eq_idx
                 new_eq_g[i[2]] = g[i[1]]
                 # @assert !haskey(ieq_idx,i[1])
@@ -254,13 +246,12 @@ type StructJuMPModel <: ModelInterface
                 # @assert !haskey(eq_idx,i[1])
                 new_inq_g[i[2]] = g[i[1]]
             end
-            if instance.prof
-                instance.t_itermap_eval_g+=toq()
-            end
+            @timing instance.prof instance.t_itermap_eval_g+=toq()
+            
             # @printf("#********  str_eval_g - %d \n", id)
             # @show x0, x1 
             # @show new_eq_g, new_inq_g
-            if instance.prof
+            @timing instance.prof begin
                 instance.t_eval_g += toq()
                 instance.n_eval_g += 1
             end
@@ -275,13 +266,10 @@ type StructJuMPModel <: ModelInterface
             x = build_x(m,rowid,x0,x1)
             g = Vector{Float64}(length(x))
             
-            if instance.prof 
-                tic()
-            end
+            @timing instance.prof tic()
+            
             MathProgBase.eval_grad_f(e,g,x)
-            if instance.prof
-                instance.t_jump += toq()
-            end
+            @timing instance.prof instance.t_jump += toq()
             
             @assert length(g) == MathProgBase.numvar(getModel(m,rowid))
             @assert length(new_grad_f) == getNumVars(m,colid)
@@ -313,13 +301,11 @@ type StructJuMPModel <: ModelInterface
             if(mode == :Structure)
                 if !haskey(matJac, rowid)
                     e = instance.evaluatorMap[rowid]
-                    if instance.prof
-                        tic()
-                    end
+
+                    @timing instance.prof tic()
                     jac_I,jac_J = MathProgBase.jac_structure(e)
-                    if instance.prof
-                        instance.t_jump += toq()
-                    end
+                    @timing instance.prof instance.t_jump += toq()
+                    
                     mm = getModel(m,rowid)
                     matJac[rowid] = MatStorage(jac_I,jac_J, MathProgBase.numconstr(mm),MathProgBase.numvar(mm))
                     @assert length(jac_I) == length(matJac[rowid].value)
@@ -367,21 +353,17 @@ type StructJuMPModel <: ModelInterface
                 # @show eq_jac_I
                 # @show eq_jac_J
 
-                if instance.prof
-                    tic()
-                end
+                @timing instance.prof tic()
                 eq_jac = sparse(matEq.rowIdx,matEq.colIdx,matEq.value,matEq.m, matEq.n)
-                if instance.prof
+                @timing instance.prof begin
                     instance.t_jac_spconv += toq()
                     instance.n_jac_spconv += 1
                 end
                 # @show ieq_jac_I
                 # @show ieq_jac_J
-                if instance.prof
-                    tic()
-                end
+                @timing instance.prof tic()
                 ieq_jac = sparse(matIeq.rowIdx,matIeq.colIdx,matIeq.value,matIeq.m, matIeq.n)
-                if instance.prof
+                @timing instance.prof begin
                     instance.t_jac_spconv += toq()
                     instance.n_jac_spconv += 1
                 end
@@ -401,13 +383,11 @@ type StructJuMPModel <: ModelInterface
                 jac_g = mat.value
                 if(!mat.isVal)
                     e = instance.evaluatorMap[rowid]
-                    if instance.prof
-                        tic()
-                    end
+
+                    @timing instance.prof tic()
                     MathProgBase.eval_jac_g(e,jac_g,build_x(m,rowid,x0,x1))
-                    if instance.prof
-                        instance.t_jump += toq()
-                    end
+                    @timing instance.prof instance.t_jump += toq()
+                    
                     mat.isVal = true
                 end
 
@@ -439,11 +419,10 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(eq_jac_g) != 0)
-                    if instance.prof 
-                        tic()
-                    end
+
+                    @timing instance.prof tic()
                     eq_jac = sparse(matEq.rowIdx, matEq.colIdx, matEq.value, matEq.m, matEq.n, keepzeros=true)
-                    if instance.prof
+                    @timing instance.prof begin
                         instance.t_jac_spconv += toq()
                         instance.n_jac_spconv += 1
                     end
@@ -465,11 +444,9 @@ type StructJuMPModel <: ModelInterface
                 end
 
                 if(length(ieq_jac_g) != 0)
-                    if instance.prof
-                        tic()
-                    end
+                    @timing instance.prof tic()
                     ieq_jac = sparse(matIeq.rowIdx, matIeq.colIdx, matIeq.value, matIeq.m, matIeq.n, keepzeros=true)
-                    if instance.prof
+                    @timing instance.prof begin
                         instance.t_jac_spconv += toq()
                         instance.n_jac_spconv += 1
                     end
@@ -520,13 +497,11 @@ type StructJuMPModel <: ModelInterface
                 if !haskey(matHess,colid)
                     e = instance.evaluatorMap[colid]
                     mm = getModel(m,rowid)
-                    if instance.prof
-                        tic()
-                    end
+
+                    @timing instance.prof tic()
                     (h_J,h_I) = MathProgBase.hesslag_structure(e) # upper trangular
-                    if instance.prof
-                        instance.t_jump += toq()
-                    end
+                    @timing instance.prof instance.t_jump += toq()
+                    
                     matHess[colid] = MatStorage(h_I,h_J,MathProgBase.numvar(mm),MathProgBase.numvar(mm))              
                 end
                 mat = matHess[colid]
@@ -611,11 +586,10 @@ type StructJuMPModel <: ModelInterface
                     end
                 end
                 matP = matHessMap[p]
-                if instance.prof
-                    tic()
-                end
+
+                @timing instance.prof tic()
                 laghess = sparse(matP.rowIdx,matP.colIdx, matP.value, matP.m, matP.n)
-                if instance.prof
+                @timing instance.prof begin
                     instance.t_hess_spconv += toq()
                     instance.n_hess_spconv += 1
                 end
@@ -638,13 +612,10 @@ type StructJuMPModel <: ModelInterface
                         end
                         x = build_x(m,rowid,x0,x1)
                         # @show x,lam_new
-                        if instance.prof 
-                            tic()
-                        end
+                        @timing instance.prof tic()
                         MathProgBase.eval_hesslag(e,mat.value,x,obj_factor,lam_new)
-                        if instance.prof
-                            instance.t_jump += toq()
-                        end
+                        @timing instance.prof instance.t_jump += toq()
+                        
                         mat.isVal = true
                     end
                     h_I = mat.rowIdx
@@ -672,11 +643,9 @@ type StructJuMPModel <: ModelInterface
                     # @show new_h_I
                     # @show new_h_J
                     # @show new_h
-                    if instance.prof
-                        tic()
-                    end
+                    @timing instance.prof tic()
                     str_laghess = sparse(matP.rowIdx,matP.colIdx,matP.value,matP.m,matP.n,keepzeros = true)
-                    if instance.prof
+                    @timing instance.prof begin
                         instance.t_hess_spconv += toq()
                         instance.n_hess_spconv += 1
                     end
@@ -702,13 +671,11 @@ type StructJuMPModel <: ModelInterface
                         for i in ieq_idx
                             lam_new[i[1]] = lambda[i[2]+numeq]
                         end
-                        if instance.prof
-                            tic()
-                        end
+
+                        @timing instance.prof tic()
                         MathProgBase.eval_hesslag(e,mat.value,x,obj_factor,lam_new)
-                        if instance.prof
-                            instance.t_jump += toq()
-                        end
+                        @timing instance.prof instance.t_jump += toq()
+                        
                         mat.isVal = true
                     end
                     h_I = mat.rowIdx
@@ -728,11 +695,9 @@ type StructJuMPModel <: ModelInterface
                             matPi += 1
                         end
                     end
-                    if instance.prof
-                        tic()
-                    end
+                    @timing instance.prof tic()
                     str_laghess = sparse(matP.rowIdx,matP.colIdx,matP.value,matP.m,matP.n,keepzeros = true)
-                    if instance.prof 
+                    @timing instance.prof begin
                         instance.t_hess_spconv += toq()
                         instance.n_hess_spconv += 1
                     end
@@ -759,13 +724,10 @@ type StructJuMPModel <: ModelInterface
                         for i in ieq_idx
                             lam_new[i[1]] = lambda[i[2]+numeq]
                         end
-                        if instance.prof
-                            tic()
-                        end
+                        @timing instance.prof tic()
                         MathProgBase.eval_hesslag(e,mat.value,x,obj_factor,lam_new)
-                        if instance.prof
-                            instance.t_jump += toq()
-                        end
+                        @timing instance.prof instance.t_jump += toq()
+                        
                         mat.isVal = true
                     end
                     h_I = mat.rowIdx
@@ -790,11 +752,9 @@ type StructJuMPModel <: ModelInterface
                     @assert matP0.m == matP.m == matP0.n == matP.n == getNumVars(m,0)
 
                     # @show h0_I,h0_J
-                    if instance.prof
-                        tic()
-                    end
+                    @timing instance.prof tic()
                     str_laghess = sparse([matP.rowIdx;h0_I], [matP.colIdx;h0_J], [matP.value;zeros(Float64,length(h0_I))], matP.m, matP.n, keepzeros=true)
-                    if instance.prof
+                    @timing instance.prof begin
                         instance.t_hess00_spconv += toq()
                         instance.n_hess00_spconv += 1
                     end
@@ -863,47 +823,36 @@ end
 function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs...)
     # @show "solve"
     t_sj_lifetime = 0.0
-    if with_prof
-        tic()
-    end
+    @timing with_prof tic()
+    
     # MPI.Init() ＃initialize in model loading
 
     comm = getStructure(model).mpiWrapper.comm
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
     t_sj_model_init = 0.0
-    if with_prof
-        tic()
-    end    
+    @timing with_prof tic()
+
     prob = PipsNlpSolver.createProblemStruct(comm, StructJuMPModel(model,with_prof), with_prof)
 
-    if with_prof
-        t_sj_model_init += toq()
-    end
+    @timing with_prof t_sj_model_init += toq()
 
     # @show "end createStructJuMPPipsNlpProblem"
 
     t_sj_solver_total = 0.0
-    if with_prof
-        tic()
-    end
+    @timing with_prof tic()
+    
     status = PipsNlpSolver.solveProblemStruct(prob)
     
-    if with_prof
-        t_sj_solver_total += toq()
-    end
-
-
-    if with_prof
-        t_sj_lifetime += toq()
-    end
-
+    @timing with_prof t_sj_solver_total += toq()
+    
+    @timing with_prof t_sj_lifetime += toq()
 
     # solver_time = solver_total - modeling_time
     # if(0==MPI.Comm_rank(MPI.COMM_WORLD)) 
     #   @printf "Total time %.4f (initialization=%.3f modelling=%.3f solver=%.3f) (in sec)\n" t_total prob.model.t_sj_init modeling_time solver_time
     # end
-    if with_prof
+    @timing with_prof begin
         mid, nprocs = getMyRank()
         bname = string(split(ARGS[1],"/")[2],"_",num_scenarios(model))
         run(`mkdir -p ./out/$bname`)
@@ -928,11 +877,17 @@ function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs.
         end
         @printf(tfile, "%s", s1)
         @printf(tfile, "%s", s2)
+        @printf("%s",s3)
+        @printf("%s",s4)
+        @printf("%s",s5)
+        @printf("%s",s6)
+        @printf("%s",s7)
         close(tfile)
         n1 = string("./out/",nprocs,".",mid,".c.txt")
         n2 = string("./out/",bname,"/",bname,"_",nprocs,".",mid,".c.txt")
         run(`mv $n1 $n2`)
     end
+
     return PIPSRetCodeToSolverInterfaceCode[status]
 end
 
