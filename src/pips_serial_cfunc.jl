@@ -71,7 +71,7 @@ function eval_f_wrapper(x_ptr::Ptr{Float64}, obj_ptr::Ptr{Float64}, user_data::P
     # Extract Julia the problem from the pointer
     prob = unsafe_pointer_to_objref(user_data)::PipsNlpProblem
     # Calculate the new objective
-    new_obj = convert(Float64, prob.eval_f(pointer_to_array(x_ptr, prob.n)))::Float64
+    new_obj = convert(Float64, prob.eval_f(unsafe_wrap(Array,x_ptr, prob.n)))::Float64
     # Fill out the pointer
     unsafe_store!(obj_ptr, new_obj)
     # Done
@@ -84,8 +84,8 @@ function eval_g_wrapper(x_ptr::Ptr{Float64}, g_ptr::Ptr{Float64}, user_data::Ptr
     # Extract Julia the problem from the pointer
     prob = unsafe_pointer_to_objref(user_data)::PipsNlpProblem
     # Calculate the new constraint values
-    new_g = pointer_to_array(g_ptr, prob.m)
-    prob.eval_g(pointer_to_array(x_ptr, prob.n), new_g)
+    new_g = unsafe_wrap(Array,g_ptr, prob.m)
+    prob.eval_g(unsafe_wrap(Array,x_ptr, prob.n), new_g)
     # Done
     return Int32(1)
 end
@@ -96,8 +96,8 @@ function eval_grad_f_wrapper(x_ptr::Ptr{Float64}, grad_f_ptr::Ptr{Float64}, user
     # Extract Julia the problem from the pointer
     prob = unsafe_pointer_to_objref(user_data)::PipsNlpProblem
     # Calculate the gradient
-    new_grad_f = pointer_to_array(grad_f_ptr, Int(prob.n))
-    prob.eval_grad_f(pointer_to_array(x_ptr, Int(prob.n)), new_grad_f)
+    new_grad_f = unsafe_wrap(Array,grad_f_ptr, Int(prob.n))
+    prob.eval_grad_f(unsafe_wrap(Array,x_ptr, Int(prob.n)), new_grad_f)
     if prob.sense == :Max
         new_grad_f *= -1.0
     end
@@ -114,10 +114,10 @@ function eval_jac_g_wrapper(x_ptr::Ptr{Float64}, values_ptr::Ptr{Float64}, iRow:
     #@show prob
     # Determine mode
     mode = (values_ptr == C_NULL) ? (:Structure) : (:Values)
-    x = pointer_to_array(x_ptr, prob.n)
-    irows = pointer_to_array(iRow, Int(prob.nzJac))
-    kcols = pointer_to_array(jCol, Int(prob.n+1))
-    values = pointer_to_array(values_ptr, Int(prob.nzJac))
+    x = unsafe_wrap(Array,x_ptr, prob.n)
+    irows = unsafe_wrap(Array,iRow, Int(prob.nzJac))
+    kcols = unsafe_wrap(Array,jCol, Int(prob.n+1))
+    values = unsafe_wrap(Array,values_ptr, Int(prob.nzJac))
     prob.eval_jac_g(x, mode, irows, kcols, values)
     if mode == :Structure 
 	    convert_to_c_idx(irows)
@@ -139,11 +139,11 @@ function eval_h_wrapper(x_ptr::Ptr{Float64}, lambda_ptr::Ptr{Float64}, values_pt
     else
         # Determine mode
         mode = (values_ptr == C_NULL) ? (:Structure) : (:Values)
-        x = pointer_to_array(x_ptr, prob.n)
-        lambda = pointer_to_array(lambda_ptr, prob.m)
-        irows = pointer_to_array(iRow, Int(prob.nzHess))
-        kcols = pointer_to_array(jCol, Int(prob.n+1))
-        values = pointer_to_array(values_ptr, Int(prob.nzHess))
+        x = unsafe_wrap(Array,x_ptr, prob.n)
+        lambda = unsafe_wrap(Array,lambda_ptr, prob.m)
+        irows = unsafe_wrap(Array,iRow, Int(prob.nzHess))
+        kcols = unsafe_wrap(Array,jCol, Int(prob.n+1))
+        values = unsafe_wrap(Array,values_ptr, Int(prob.nzHess))
         obj_factor = 1.0
         if prob.sense == :Max
             obj_factor *= -1.0

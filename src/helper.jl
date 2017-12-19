@@ -149,7 +149,7 @@ macro timing(cond,code)
     end
 end
 
-function SparseMatrix.sparse(I,J,V, M, N;keepzeros=false)
+function SparseArrays.sparse(I,J,V, M, N;keepzeros=false)
     if(!keepzeros)
         return sparse(I,J,V,M,N)
     else

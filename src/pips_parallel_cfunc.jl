@@ -178,7 +178,7 @@ function str_init_x0_wrapper(x0_ptr::Ptr{Float64}, cbd::Ptr{CallBackData})
     colid = Int(Int(data.col_node_id))
     assert(rowid == colid)
     n0 = prob.model.get_num_cols(colid)
-    x0 = pointer_to_array(x0_ptr, n0)
+    x0 = unsafe_wrap(Array, x0_ptr, n0)
 
     @timing prob.prof tic()
     prob.model.str_init_x0(colid,x0)
@@ -208,10 +208,10 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     if flag == 0
         # @show mode
     	if(mode==:Structure)
-            col_lb = pointer_to_array(col_lb_ptr,0)
-    		col_ub = pointer_to_array(col_ub_ptr,0)
-    		row_lb = pointer_to_array(row_lb_ptr,0)
-    		row_ub = pointer_to_array(row_ub_ptr,0)
+            col_lb = unsafe_wrap(Array,col_lb_ptr,0)
+    		col_ub = unsafe_wrap(Array,col_ub_ptr,0)
+    		row_lb = unsafe_wrap(Array,row_lb_ptr,0)
+    		row_ub = unsafe_wrap(Array,row_ub_ptr,0)
             @timing prob.prof tic()
     		(n,m) = prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
             @timing prob.prof prob.t_jl_str_prob_info += toq()
@@ -224,10 +224,10 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     	else
     		n = unsafe_load(n_ptr)
     		m = unsafe_load(m_ptr)
-    		col_lb = pointer_to_array(col_lb_ptr,n)
-    		col_ub = pointer_to_array(col_ub_ptr,n)
-    		row_lb = pointer_to_array(row_lb_ptr,m)
-    		row_ub = pointer_to_array(row_ub_ptr,m)
+    		col_lb = unsafe_wrap(Array,col_lb_ptr,n)
+    		col_ub = unsafe_wrap(Array,col_ub_ptr,n)
+    		row_lb = unsafe_wrap(Array,row_lb_ptr,m)
+    		row_ub = unsafe_wrap(Array,row_ub_ptr,m)
 
             @timing prob.prof tic()
     		prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
@@ -250,10 +250,10 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     else
         @assert flag ==1
         if mode == :Structure
-            col_lb = pointer_to_array(col_lb_ptr,0)
-            col_ub = pointer_to_array(col_ub_ptr,0)
-            row_lb = pointer_to_array(row_lb_ptr,0)
-            row_ub = pointer_to_array(row_ub_ptr,0)
+            col_lb = unsafe_wrap(Array,col_lb_ptr,0)
+            col_ub = unsafe_wrap(Array,col_ub_ptr,0)
+            row_lb = unsafe_wrap(Array,row_lb_ptr,0)
+            row_ub = unsafe_wrap(Array,row_ub_ptr,0)
             (n,m) = prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
             # @show n,m
             unsafe_store!(m_ptr,convert(Cint,m)::Cint)
@@ -279,8 +279,8 @@ function str_eval_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, obj_ptr:
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(colid)
     # Calculate the new objective
-    x0 = pointer_to_array(x0_ptr, n0)
-    x1 = pointer_to_array(x1_ptr, n1)
+    x0 = unsafe_wrap(Array, x0_ptr, n0)
+    x1 = unsafe_wrap(Array, x1_ptr, n1)
 
     @timing prob.prof tic()
     new_obj = convert(Float64, prob.model.str_eval_f(colid,x0,x1))::Float64
@@ -304,13 +304,13 @@ function str_eval_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, eq_g_ptr
     assert(rowid == colid)
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(colid)
-    x0 = pointer_to_array(x0_ptr, n0)
-    x1 = pointer_to_array(x1_ptr, n1)
+    x0 = unsafe_wrap(Array, x0_ptr, n0)
+    x1 = unsafe_wrap(Array, x1_ptr, n1)
     # Calculate the new constraint values
     neq = prob.model.get_num_eq_cons(rowid)
     nineq = prob.model.get_num_ineq_cons(rowid)
-    new_eq_g = pointer_to_array(eq_g_ptr,neq)
-    new_inq_g = pointer_to_array(inq_g_ptr, nineq)
+    new_eq_g = unsafe_wrap(Array, eq_g_ptr, neq)
+    new_inq_g = unsafe_wrap(Array, inq_g_ptr, nineq)
 
     @timing prob.prof tic()
     prob.model.str_eval_g(colid,x0,x1,new_eq_g,new_inq_g)
@@ -334,11 +334,11 @@ function str_eval_grad_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, gra
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(rowid)
     # @show n0,n1
-    x0 = pointer_to_array(x0_ptr, n0)
-    x1 = pointer_to_array(x1_ptr, n1)
+    x0 = unsafe_wrap(Array, x0_ptr, n0)
+    x1 = unsafe_wrap(Array, x1_ptr, n1)
     # Calculate the gradient
     grad_len = prob.model.get_num_cols(colid)
-    new_grad_f = pointer_to_array(grad_f_ptr, grad_len)
+    new_grad_f = unsafe_wrap(Array, grad_f_ptr, grad_len)
 
     @timing prob.prof tic()
     prob.model.str_eval_grad_f(rowid,colid,x0,x1,new_grad_f)
@@ -369,8 +369,8 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     n0 = prob.model.get_num_cols(0)
     n1 = prob.model.get_num_cols(rowid) #we can do this because of 2-level and no linking constraint
     # @show n0, n1 
-    x0 = pointer_to_array(x0_ptr, n0)
-    x1 = pointer_to_array(x1_ptr, n1)
+    x0 = unsafe_wrap(Array, x0_ptr, n0)
+    x1 = unsafe_wrap(Array, x1_ptr, n1)
     # @show x0
     # @show x1 
     nrow = prob.model.get_num_rows(rowid) 
@@ -380,12 +380,12 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     mode = (e_col_ptr == C_NULL && i_col_ptr == C_NULL) ? (:Structure) : (:Values)
     if flag != 1
         if(mode == :Structure)
-        	e_values = pointer_to_array(e_values_ptr,0)
-    		e_colptr = pointer_to_array(e_col_ptr,0)
-    		e_rowidx = pointer_to_array(e_row_ptr,0)
-    		i_values = pointer_to_array(i_values_ptr,0)
-    		i_colptr = pointer_to_array(i_col_ptr,0)
-    		i_rowidx = pointer_to_array(i_row_ptr,0)
+        	e_values = unsafe_wrap(Array,e_values_ptr,0)
+    		e_colptr = unsafe_wrap(Array,e_col_ptr,0)
+    		e_rowidx = unsafe_wrap(Array,e_row_ptr,0)
+    		i_values = unsafe_wrap(Array,i_values_ptr,0)
+    		i_colptr = unsafe_wrap(Array,i_col_ptr,0)
+    		i_rowidx = unsafe_wrap(Array,i_row_ptr,0)
             
             @timing prob.prof tic()
             (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,flag,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
@@ -396,14 +396,14 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
     		# @show "structure - ",(e_nz,i_nz)
         else
         	e_nz = unsafe_load(e_nz_ptr)
-        	e_values = pointer_to_array(e_values_ptr,e_nz)
-        	e_rowidx = pointer_to_array(e_row_ptr, e_nz)
-        	e_colptr = pointer_to_array(e_col_ptr, ncol+1)
+        	e_values = unsafe_wrap(Array,e_values_ptr,e_nz)
+        	e_rowidx = unsafe_wrap(Array,e_row_ptr,e_nz)
+        	e_colptr = unsafe_wrap(Array,e_col_ptr,ncol+1)
         	i_nz = unsafe_load(i_nz_ptr)
         	# @show "values - ",(e_nz,i_nz), ncol
-        	i_values = pointer_to_array(i_values_ptr,i_nz)
-        	i_rowidx = pointer_to_array(i_row_ptr, i_nz)
-        	i_colptr = pointer_to_array(i_col_ptr, ncol+1)
+        	i_values = unsafe_wrap(Array,i_values_ptr,i_nz)
+        	i_rowidx = unsafe_wrap(Array,i_row_ptr,i_nz)
+        	i_colptr = unsafe_wrap(Array,i_col_ptr,ncol+1)
             # @show x0
             # @show x1 
             @timing prob.prof tic()
@@ -453,15 +453,15 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
     low  = min(rowid,colid)
     n0 = prob.model.get_num_cols(0) 
     n1 = prob.model.get_num_cols(high)
-    x0 = pointer_to_array(x0_ptr, n0)
-    x1 = pointer_to_array(x1_ptr, n1)
+    x0 = unsafe_wrap(Array,x0_ptr,n0)
+    x1 = unsafe_wrap(Array,x1_ptr,n1)
     # @show x0
     # @show x1
     ncol = prob.model.get_num_cols(low)
     g0 = prob.model.get_num_rows(high) 
     # @show g0
     # @show ncol
-    lambda = pointer_to_array(lambda_ptr, g0)
+    lambda = unsafe_wrap(Array,lambda_ptr,g0)
     obj_factor = 1.0
     if prob.model.get_sense() == :Max
         obj_factor *= -1.0
@@ -469,9 +469,9 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
     # Did the user specify a Hessian
     mode = (col_ptr == C_NULL) ? (:Structure) : (:Values)
     if(mode == :Structure)
-    	values = pointer_to_array(values_ptr,0)
-		colptr = pointer_to_array(col_ptr,0)
-		rowidx = pointer_to_array(row_ptr,0)
+    	values = unsafe_wrap(Array,values_ptr,0)
+		colptr = unsafe_wrap(Array,col_ptr,0)
+		rowidx = unsafe_wrap(Array,row_ptr,0)
         
         @timing prob.prof tic()
 		nz = prob.model.str_eval_h(rowid,colid,flag, x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
@@ -481,9 +481,9 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
 		# @show "structure - ", nz
     else
     	nz = unsafe_load(nz_ptr)
-    	values = pointer_to_array(values_ptr, nz)
-    	rowidx = pointer_to_array(row_ptr, nz)
-    	colptr = pointer_to_array(col_ptr, ncol+1)
+    	values = unsafe_wrap(Array, values_ptr, nz)
+    	rowidx = unsafe_wrap(Array, row_ptr, nz)
+    	colptr = unsafe_wrap(Array, col_ptr, ncol+1)
     	# @show "value - ", nz
         @timing prob.prof tic()
     	prob.model.str_eval_h(rowid,colid,flag,x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
@@ -507,9 +507,9 @@ function str_write_solution_wrapper(x_ptr::Ptr{Float64}, y_eq_ptr::Ptr{Float64},
     nx = prob.model.get_num_cols(rowid)
     neq = prob.model.get_num_eq_cons(rowid)
     nieq = prob.model.get_num_ineq_cons(rowid)
-    x = pointer_to_array(x_ptr, nx)
-    y_eq = pointer_to_array(y_eq_ptr,neq)
-    y_ieq = pointer_to_array(y_ieq_ptr,nieq)
+    x = unsafe_wrap(Array,x_ptr,nx)
+    y_eq = unsafe_wrap(Array,y_eq_ptr,neq)
+    y_ieq = unsafe_wrap(Array,y_ieq_ptr,nieq)
     @timing prob.prof tic()
     prob.model.str_write_solution(rowid,x,y_eq,y_ieq)
     @timing prob.prof prob.t_jl_write_solution += toq()
