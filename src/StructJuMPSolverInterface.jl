@@ -7,7 +7,8 @@ module StructJuMPSolverInterface
 import MPI
 
 # Struct Model interface
-abstract ModelInterface
+abstract type ModelInterface end
+#abstract ModelInterface
 
 export ModelInterface, KnownSolvers, sj_solve, getModel, getVarValue, getVarValues, getNumVars, 
         getNumCons, getTotalNumVars, getTotalNumCons, getLocalBlocksIds, getLocalChildrenIds,
