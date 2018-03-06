@@ -3,14 +3,19 @@ StructJuMPSolverInterface
 
 ### StructJuMP's Solver Interface
 
-StructJuMPSolverInterface defines the nonlinear solver interface for [StructJuMP](https://github.com/joehuchette/StructJuMP.jl)--the Structured Modeling Extension for [JuMP](https://github.com/JuliaOpt/JuMP.jl) and provides glue code for [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/) solvers.
+StructJuMPSolverInterface provides the NLP solver interface and glue code for [StructJuMP](https://github.com/joehuchette/StructJuMP.jl), which is an extension of [JuMP](https://github.com/JuliaOpt/JuMP.jl) for structured optimization problems such as stochastic optimization problems. StructJuMPSolverInterface supports [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/) NLP solvers.
 
-PIPS parallel  interface ("PipsNlp") matches StructJuMP's paralel capabilities. The two offer a truly parallel modeling + solving environment. In addition, PIPS also has a serial interface ("PipsNlpSerial"), which is used mostly for debugging purposes. The Ipopt interface to StructJuMP is also serial.
+PIPS parallel  interface ("PipsNlp") matches StructJuMP's paralel capabilities. The two offer a truly parallel modeling + solving environment. In addition, StructJuMPSolverInterface provides an PIPS serial interface ("PipsNlpSerial"), which is used mostly for debugging purposes, and an Ipopt interface to StructJuMP, which is also serial.
 
-### Solver Supports
+<!--## Solver Supports -->
 
 <!--There are two solvers currently implement this interface. They are [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/). When using PIPS, user can choose either the parallel or serial implementations for solving the structured model. When the parallel solver is selected, the parallel problem allocation and generation are done automatically at the backend, that is also transparent to the user. It enables user to easily adopt the state-of-art parallel solvers and to solve large scale optimization problems which could be too big to allocate on a single node. -->
 
+### Instalation
+
+```julia
+Pkg.clone("https://github.com/StructJuMP/StructJuMPSolverInterface.jl")
+```
 
 
 ### An Example
