@@ -47,9 +47,10 @@ ApplicationReturnStatus = Dict(
 
 function sj_solve(model; solver="Unknown", with_prof=false, suppress_warmings=false,kwargs...)
     if !haskey(KnownSolvers,solver)
-        Base.warn("Unknow solver: ", solver)
+        Base.warn("Unknown solver: ", solver)
         Base.error("Known solvers are: ", keys(KnownSolvers))
     end
+    println("solver: ", solver)
     status = KnownSolvers[solver](model; with_prof=with_prof, suppress_warmings=false,kwargs...)
     
     if !haskey(ApplicationReturnStatus,status)

@@ -5,6 +5,7 @@
 module PipsNlpSolver  
 
 using StructJuMPSolverInterface
+using StructJuMP, JuMP
 import MPI
 
 try
@@ -123,23 +124,60 @@ type PipsNlpProblemStruct
     prof::Bool
 
     n_iter::Int
-    t_jl_init_x0::Float64
-    t_jl_str_prob_info::Float64
-    t_jl_eval_f::Float64
-    t_jl_eval_g::Float64
-    t_jl_eval_grad_f::Float64
+    n_jl_str_eval_jac_g::Int
+    t_jl_init_x0_0::Float64
+    t_jl_init_x0_n::Float64
+    t_jl_str_prob_info_0::Float64
+    t_jl_str_prob_info_n::Float64
+    t_jl_eval_f_0::Float64
+    t_jl_eval_f_n::Float64
+    t_jl_eval_g_0::Float64
+    t_jl_eval_g_n::Float64
+    t_jl_eval_grad_f_0::Float64
+    t_jl_eval_grad_f_n::Float64
 
-    t_jl_eval_jac_g::Float64
-    t_jl_str_eval_jac_g::Float64
-    t_jl_eval_h::Float64
-    t_jl_str_eval_h::Float64
-    t_jl_write_solution::Float64
+    t_jl_eval_jac_g_0::Float64
+    t_jl_eval_jac_g_n::Float64
+    t_jl_str_eval_jac_g_0::Float64
+    t_jl_str_eval_jac_g_n::Float64
+    t_jl_eval_h_0::Float64
+    t_jl_eval_h_n::Float64
+    t_jl_str_eval_h_0::Float64
+    t_jl_str_eval_h_n::Float64
+    t_jl_write_solution_0::Float64
+    t_jl_write_solution_n::Float64
+
+    t_jl_STR_init_x0_0::Float64
+    t_jl_STR_init_x0_n::Float64
+    t_jl_STR_str_prob_info_0::Float64
+    t_jl_STR_str_prob_info_n::Float64
+    t_jl_STR_eval_f_0::Float64
+    t_jl_STR_eval_f_n::Float64
+    t_jl_STR_eval_g_0::Float64
+    t_jl_STR_eval_g_n::Float64
+    t_jl_STR_eval_grad_f_0::Float64
+    t_jl_STR_eval_grad_f_n::Float64
+
+    t_jl_STR_eval_jac_g_0::Float64
+    t_jl_STR_eval_jac_g_n::Float64
+    t_jl_STR_str_eval_jac_g_0::Float64
+    t_jl_STR_str_eval_jac_g_n::Float64
+    t_jl_STR_eval_h_0::Float64
+    t_jl_STR_eval_h_n::Float64
+    t_jl_STR_str_eval_h_0::Float64
+    t_jl_STR_str_eval_h_n::Float64
+    t_jl_STR_write_solution_0::Float64
+    t_jl_STR_write_solution_n::Float64
 
     t_jl_str_total::Float64
     t_jl_eval_total::Float64
+    t_jl_str_total_0::Float64
+    t_jl_eval_total_0::Float64
+    t_jl_str_total_n::Float64
+    t_jl_eval_total_n::Float64
     
     function PipsNlpProblemStruct(comm, model, prof)
-        prob = new(C_NULL, model, comm, prof,-3
+        prob = new(C_NULL, model, comm, prof,-3,0
             ,0.0,0.0,0.0,0.0,0.0
             ,0.0,0.0,0.0,0.0,0.0
             ,0.0,0.0
@@ -182,7 +220,11 @@ function str_init_x0_wrapper(x0_ptr::Ptr{Float64}, cbd::Ptr{CallBackData})
 
     @timing prob.prof tic()
     prob.model.str_init_x0(colid,x0)
-    @timing prob.prof prob.t_jl_init_x0 += toq()
+    if colid == 0 && rowid == 0
+      @timing prob.prof prob.t_jl_init_x0_0 += toq()
+    else
+      @timing prob.prof prob.t_jl_init_x0_n += toq()
+    end
     
     return Int32(1)
 end
@@ -214,7 +256,11 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
     		row_ub = unsafe_wrap(Array,row_ub_ptr,0)
             @timing prob.prof tic()
     		(n,m) = prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
-            @timing prob.prof prob.t_jl_str_prob_info += toq()
+        if colid == 0 && rowid == 0
+            @timing prob.prof prob.t_jl_str_prob_info_0 += toq()
+        else
+            @timing prob.prof prob.t_jl_str_prob_info_n += toq()
+        end
 
     		unsafe_store!(n_ptr,convert(Cint,n)::Cint)
     		unsafe_store!(m_ptr,convert(Cint,m)::Cint)
@@ -231,8 +277,11 @@ function str_prob_info_wrapper(n_ptr::Ptr{Cint}, col_lb_ptr::Ptr{Float64}, col_u
 
             @timing prob.prof tic()
     		prob.model.str_prob_info(colid,flag,mode,col_lb,col_ub,row_lb,row_ub)
-            @timing prob.prof prob.t_jl_str_prob_info += toq()
-            
+        if colid == 0 && rowid == 0
+            @timing prob.prof prob.t_jl_str_prob_info_0 += toq()
+        else
+            @timing prob.prof prob.t_jl_str_prob_info_n += toq()
+        end
 
     		neq = 0
     		nineq = 0
@@ -284,8 +333,13 @@ function str_eval_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, obj_ptr:
 
     @timing prob.prof tic()
     new_obj = convert(Float64, prob.model.str_eval_f(colid,x0,x1))::Float64
-    @timing prob.prof prob.t_jl_eval_f += toq()
-    
+    @timing prob.prof t_eval_f = toq()
+    if rowid == 0 && colid == 0
+      @timing prob.prof prob.t_jl_eval_f_0 += t_eval_f
+    else
+      @timing prob.prof prob.t_jl_eval_f_n += t_eval_f
+    end
+
     # Fill out the pointer
     unsafe_store!(obj_ptr, new_obj)
     # Done
@@ -314,7 +368,11 @@ function str_eval_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, eq_g_ptr
 
     @timing prob.prof tic()
     prob.model.str_eval_g(colid,x0,x1,new_eq_g,new_inq_g)
-    @timing prob.prof prob.t_jl_eval_g += toq()
+    if colid == 0 && rowid == 0
+      @timing prob.prof prob.t_jl_eval_g_0 += toq()
+    else
+      @timing prob.prof prob.t_jl_eval_g_n += toq()
+    end
     
     # Done
     return Int32(1)
@@ -342,7 +400,11 @@ function str_eval_grad_f_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, gra
 
     @timing prob.prof tic()
     prob.model.str_eval_grad_f(rowid,colid,x0,x1,new_grad_f)
-    @timing prob.prof prob.t_jl_eval_grad_f += toq()
+    if rowid == 0 && colid == 0
+      @timing prob.prof prob.t_jl_eval_grad_f_0 += toq()
+    else
+      @timing prob.prof prob.t_jl_eval_grad_f_n += toq()
+    end
     
     if prob.model.get_sense() == :Max
         new_grad_f *= -1.0
@@ -389,7 +451,12 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
             
             @timing prob.prof tic()
             (e_nz,i_nz) = prob.model.str_eval_jac_g(rowid,colid,flag,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
-            @timing prob.prof prob.t_jl_str_eval_jac_g += toq()
+            if rowid == 0 && colid == 0
+              @timing prob.prof prob.t_jl_str_eval_jac_g_0 += toq()
+            else
+              @timing prob.prof prob.t_jl_str_eval_jac_g_n += toq()
+            end
+            prob.n_jl_str_eval_jac_g += 1;
             
             unsafe_store!(e_nz_ptr,convert(Cint,e_nz)::Cint)
     		unsafe_store!(i_nz_ptr,convert(Cint,i_nz)::Cint)
@@ -408,7 +475,11 @@ function str_eval_jac_g_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64},
             # @show x1 
             @timing prob.prof tic()
         	prob.model.str_eval_jac_g(rowid,colid,flag,x0,x1,mode,e_rowidx,e_colptr,e_values,i_rowidx,i_colptr,i_values)
-            @timing prob.prof prob.t_jl_eval_jac_g += toq()
+          if rowid == 0 && colid == 0
+            @timing prob.prof prob.t_jl_eval_jac_g_0 += toq()
+          else
+            @timing prob.prof prob.t_jl_eval_jac_g_n += toq()
+          end
         end
     else
         @assert flag == 1
@@ -438,15 +509,8 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
     rowid = Int(data.row_node_id)
     colid = Int(data.col_node_id)
     flag = Int(data.flag)
-    # @message @sprintf(" julia - eval_h_wrapper - %d %d %d", rowid, colid, flag)
-    @timing prob.prof begin
-        if rowid == colid ==0 
-            prob.n_iter += 1
-            if prob.n_iter == 0
-                prob.t_jl_str_total = t_reset(prob)
-            end
-        end
-    end
+    mid, nprocs = getMyRank()
+    # @message @sprintf(" julia - eval_h_wrapper - %d %d %d %d %d", rowid, colid, flag, mid, nprocs)
     # @show prob.n_iter
 
     high = max(rowid,colid)
@@ -475,7 +539,11 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
         
         @timing prob.prof tic()
 		nz = prob.model.str_eval_h(rowid,colid,flag, x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
-        @timing prob.prof prob.t_jl_str_eval_h += toq()
+    if colid == 0 && rowid == 0
+        @timing prob.prof prob.t_jl_str_eval_h_0 += toq()
+    else
+        @timing prob.prof prob.t_jl_str_eval_h_n += toq()
+    end
         
 		unsafe_store!(nz_ptr,convert(Cint,nz)::Cint)
 		# @show "structure - ", nz
@@ -487,9 +555,23 @@ function str_eval_h_wrapper(x0_ptr::Ptr{Float64}, x1_ptr::Ptr{Float64}, lambda_p
     	# @show "value - ", nz
         @timing prob.prof tic()
     	prob.model.str_eval_h(rowid,colid,flag,x0,x1,obj_factor,lambda,mode,rowidx,colptr,values)
-        @timing prob.prof prob.t_jl_eval_h += toq()
+      if rowid == 0 && colid == 0
+        @timing prob.prof prob.t_jl_eval_h_0 += toq()
+      else
+        @timing prob.prof prob.t_jl_eval_h_n += toq()
+      end
     end
     # Done
+    @timing prob.prof begin
+        if rowid == colid ==0 
+            prob.n_iter += 1
+            if prob.n_iter == -1
+                prob.t_jl_str_total_0 = t_reset_0(prob)
+                prob.t_jl_str_total_n = t_reset_n(prob)
+                prob.t_jl_str_total = prob.t_jl_str_total_0 + prob.t_jl_str_total_n
+            end
+        end
+    end
     
     return Int32(1)
 end
@@ -512,7 +594,11 @@ function str_write_solution_wrapper(x_ptr::Ptr{Float64}, y_eq_ptr::Ptr{Float64},
     y_ieq = unsafe_wrap(Array,y_ieq_ptr,nieq)
     @timing prob.prof tic()
     prob.model.str_write_solution(rowid,x,y_eq,y_ieq)
-    @timing prob.prof prob.t_jl_write_solution += toq()
+    if rowid == 0 && colid == 0
+      @timing prob.prof prob.t_jl_write_solution_0 += toq()
+    else
+      @timing prob.prof prob.t_jl_write_solution_n += toq()
+    end
     
     return Int32(1)
 end
@@ -538,12 +624,12 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
     prob = PipsNlpProblemStruct(comm, model, prof)
     # @show prob
     ret = ccall(Libdl.dlsym(libparpipsnlp,:CreatePipsNlpProblemStruct),Ptr{Void},
-            (MPI.Comm, 
+            (MPI.CComm, 
             Cint, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
 	    Ptr{Void}, Ptr{Void}, Ptr{Void},Any
             ),
-            comm, 
+            MPI.CComm(comm), 
             model.get_num_scen(),
             str_init_x0_cb,
             str_prob_info_cb,
@@ -578,7 +664,9 @@ function solveProblemStruct(prob::PipsNlpProblemStruct)
     # @show ret
     prob.model.set_status(Int(ret))
 
-    prob.t_jl_eval_total = report_total_now(prob)
+    prob.t_jl_eval_total_0 = report_0_total_now(prob)
+    prob.t_jl_eval_total_n = report_n_total_now(prob)
+    prob.t_jl_eval_total = prob.t_jl_eval_total_0 + prob.t_jl_eval_total_n 
     # @show prob
     return prob.model.get_status()
 end
@@ -592,33 +680,89 @@ function freeProblemStruct(prob::PipsNlpProblemStruct)
     return ret
 end
 
-function report_total_now(prob::PipsNlpProblemStruct)
+function report_0_total_now(prob::PipsNlpProblemStruct)
     total = 0.0
-    total += prob.t_jl_init_x0 
-    total += prob.t_jl_str_prob_info 
-    total += prob.t_jl_eval_f 
-    total += prob.t_jl_eval_g 
-    total += prob.t_jl_eval_grad_f 
-    total += prob.t_jl_eval_jac_g 
-    total += prob.t_jl_str_eval_jac_g 
-    total += prob.t_jl_eval_h 
-    total += prob.t_jl_str_eval_h 
-    total += prob.t_jl_write_solution 
+    total += prob.t_jl_init_x0_0
+    total += prob.t_jl_str_prob_info_0
+    total += prob.t_jl_eval_f_0
+    total += prob.t_jl_eval_g_0
+    total += prob.t_jl_eval_grad_f_0
+    total += prob.t_jl_eval_jac_g_0
+    total += prob.t_jl_str_eval_jac_g_0
+    total += prob.t_jl_eval_h_0
+    total += prob.t_jl_str_eval_h_0 
+    total += prob.t_jl_write_solution_0 
     return total
 end
 
-function t_reset(prob::PipsNlpProblemStruct)
-    total = report_total_now(prob)
-    prob.t_jl_init_x0  = 0.0
-    prob.t_jl_str_prob_info  = 0.0
-    prob.t_jl_eval_f = 0.0
-    prob.t_jl_eval_g = 0.0
-    prob.t_jl_eval_grad_f = 0.0
-    prob.t_jl_eval_jac_g = 0.0
-    prob.t_jl_str_eval_jac_g = 0.0
-    prob.t_jl_eval_h = 0.0
-    prob.t_jl_str_eval_h = 0.0
-    prob.t_jl_write_solution = 0.0
+function report_n_total_now(prob::PipsNlpProblemStruct)
+    total = 0.0
+    total += prob.t_jl_init_x0_n
+    total += prob.t_jl_str_prob_info_n
+    total += prob.t_jl_eval_f_n
+    total += prob.t_jl_eval_g_n
+    total += prob.t_jl_eval_grad_f_n
+    total += prob.t_jl_eval_jac_g_n
+    total += prob.t_jl_str_eval_jac_g_n
+    total += prob.t_jl_eval_h_n
+    total += prob.t_jl_str_eval_h_n 
+    total += prob.t_jl_write_solution_n 
+    return total
+end
+
+function t_reset_0(prob::PipsNlpProblemStruct)
+    total = report_0_total_now(prob)
+    prob.n_jl_str_eval_jac_g = 0
+
+    prob.t_jl_STR_init_x0_0  = prob.t_jl_init_x0_0
+    prob.t_jl_STR_str_prob_info_0 = prob.t_jl_str_prob_info_0
+    prob.t_jl_STR_eval_f_0 = prob.t_jl_eval_f_0 
+    prob.t_jl_STR_eval_g_0 = prob.t_jl_eval_g_0
+    prob.t_jl_STR_eval_grad_f_0 = prob.t_jl_eval_grad_f_0
+    prob.t_jl_STR_eval_jac_g_0 = prob.t_jl_eval_jac_g_0
+    prob.t_jl_STR_str_eval_jac_g_0 = prob.t_jl_str_eval_jac_g_0
+    prob.t_jl_STR_eval_h_0 = prob.t_jl_eval_h_0
+    prob.t_jl_STR_str_eval_h_0 = prob.t_jl_str_eval_h_0 
+    prob.t_jl_STR_write_solution_0 = prob.t_jl_write_solution_0
+
+    prob.t_jl_init_x0_0  = 0.0
+    prob.t_jl_str_prob_info_0  = 0.0
+    prob.t_jl_eval_f_0 = 0.0
+    prob.t_jl_eval_g_0 = 0.0
+    prob.t_jl_eval_grad_f_0 = 0.0
+    prob.t_jl_eval_jac_g_0 = 0.0
+    prob.t_jl_str_eval_jac_g_0 = 0.0
+    prob.t_jl_eval_h_0 = 0.0
+    prob.t_jl_str_eval_h_0 = 0.0
+    prob.t_jl_write_solution_0 = 0.0
+    return total
+end
+
+function t_reset_n(prob::PipsNlpProblemStruct)
+    total = report_n_total_now(prob)
+    prob.n_jl_str_eval_jac_g = 0
+
+    prob.t_jl_STR_init_x0_n  = prob.t_jl_init_x0_n
+    prob.t_jl_STR_str_prob_info_n = prob.t_jl_str_prob_info_n
+    prob.t_jl_STR_eval_f_n = prob.t_jl_eval_f_n 
+    prob.t_jl_STR_eval_g_n = prob.t_jl_eval_g_n
+    prob.t_jl_STR_eval_grad_f_n = prob.t_jl_eval_grad_f_n
+    prob.t_jl_STR_eval_jac_g_n = prob.t_jl_eval_jac_g_n
+    prob.t_jl_STR_str_eval_jac_g_n = prob.t_jl_str_eval_jac_g_n
+    prob.t_jl_STR_eval_h_n = prob.t_jl_eval_h_n
+    prob.t_jl_STR_str_eval_h_n = prob.t_jl_str_eval_h_n 
+    prob.t_jl_STR_write_solution_n = prob.t_jl_write_solution_n
+
+    prob.t_jl_init_x0_n  = 0.0
+    prob.t_jl_str_prob_info_n  = 0.0
+    prob.t_jl_eval_f_n = 0.0
+    prob.t_jl_eval_g_n = 0.0
+    prob.t_jl_eval_grad_f_n = 0.0
+    prob.t_jl_eval_jac_g_n = 0.0
+    prob.t_jl_str_eval_jac_g_n = 0.0
+    prob.t_jl_eval_h_n = 0.0
+    prob.t_jl_str_eval_h_n = 0.0
+    prob.t_jl_write_solution_n = 0.0
     return total
 end
 
