@@ -11,7 +11,7 @@ PIPS parallel  interface ("PipsNlp") matches StructJuMP's paralel capabilities. 
 
 <!--There are two solvers currently implement this interface. They are [PIPS](https://github.com/Argonne-National-Laboratory/PIPS) and [IPOPT](http://www.coin-or.org/Ipopt/documentation/). When using PIPS, user can choose either the parallel or serial implementations for solving the structured model. When the parallel solver is selected, the parallel problem allocation and generation are done automatically at the backend, that is also transparent to the user. It enables user to easily adopt the state-of-art parallel solvers and to solve large scale optimization problems which could be too big to allocate on a single node. -->
 
-### Instalation
+### Installation
 
 ```julia
 Pkg.clone("https://github.com/StructJuMP/StructJuMPSolverInterface.jl")
