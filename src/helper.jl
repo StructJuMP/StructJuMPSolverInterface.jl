@@ -1,7 +1,9 @@
 #helper.jl
 
 using StructJuMP, JuMP
-import MathProgBase
+import Printf
+import SparseArrays
+#import MathProgBase
 
 export get_nlp_evaluator, convert_to_lower, array_copy, write_mat_to_file, convert_to_c_idx, write_x
 export @declare_second_stage, @timing, @message
@@ -119,7 +121,7 @@ function convert_to_lower(I,J,rI,rJ)
 end
 
 function write_x(subdir,iter,x)
-    @printf("writing x to ./%s/x%d \n",subdir,iter)
+    printf("writing x to ./%s/x%d \n",subdir,iter)
     run(`mkdir -p ./$subdir`)
     writedlm(string("./",subdir,"/x",iter),x,",")
 end
@@ -127,7 +129,7 @@ end
 macro message(s)
     return quote
         rank, nprocs = getMyRank()
-        @printf("[%d/%d] [ %s ] \n", rank, nprocs, $(esc(s)))
+        printf("[%d/%d] [ %s ] \n", rank, nprocs, $(esc(s)))
     end
 end
 

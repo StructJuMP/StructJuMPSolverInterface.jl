@@ -67,7 +67,7 @@ include("helper.jl")
 # include("nonstruct_helper.jl")
 
 function getModel(m,id)
-    return id==0?m:getchildren(m)[id]
+    return id==0 ? m : getchildren(m)[id]
 end
 
 function getVarValues(m,id)
@@ -146,12 +146,16 @@ function getTotalNumCons(m)
     return ncon
 end
 
+function getMyRank()
+    return 0,1 
+end
+
 function getLocalBlocksIds(m)
   myrank,mysize = getMyRank()
   numScens = num_scenarios(m)
   d = div(numScens,mysize)
   s = myrank * d + 1
-  e = myrank == (mysize-1)? numScens:s+d-1
+  e = myrank == (mysize-1) ? numScens : s+d-1
   ids=[0;s:e]
 end
 
@@ -161,13 +165,13 @@ function getLocalChildrenIds(m)
     numScens = num_scenarios(m)
     d = div(numScens,mysize)
     s = myrank * d + 1
-    e = myrank == (mysize-1)? numScens:s+d-1
+    e = myrank == (mysize-1) ? numScens : s+d-1
     ids = collect(s:e)
 end
 
 end # module StructJuMPSolverInterface
 
 
-include("pips_parallel.jl")
-include("pips_serial.jl")
-include("ipopt_serial.jl")
+Base.include(Main,"pips_parallel.jl")
+#include("pips_serial.jl")
+# Base.include(Main,"ipopt_serial.jl")

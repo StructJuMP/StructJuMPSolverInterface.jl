@@ -1,17 +1,18 @@
 #
 # Interface for PIPS-NLP parallel (structured interface)
 #
-include("pips_parallel_cfunc.jl")
 
 module PipsNlpInterface 
+include("pips_parallel_cfunc.jl")
 
-using PipsNlpSolver
+# using PipsNlpSolver
 using StructJuMP, JuMP
 using StructJuMPSolverInterface
+using Printf
 
-import MathProgBase
+# import MathProgBase
 
-type MatStorage
+struct MatStorage
     rowIdx::Vector{Int}
     colIdx::Vector{Int}
     value::Vector{Float64}
@@ -34,8 +35,8 @@ end
 #     end
 # end
 
-type StructJuMPModel <: ModelInterface
-    internalModel::JuMP.Model
+struct StructJuMPModel <: ModelInterface
+    internalModel::StructuredModel
     status::Int
     n_iter::Int
     prof::Bool
@@ -89,7 +90,7 @@ type StructJuMPModel <: ModelInterface
 
 
 
-    function StructJuMPModel(model::JuMP.Model,prof=false)
+    function StructJuMPModel(model::StructuredModel,prof=false)
         instance = new(model,0,-1,prof,
             Dict{Int,JuMP.NLPEvaluator}(),
             Dict{Int,Pair{Dict{Int,Int},Dict{Int,Int}}}(),
@@ -151,7 +152,7 @@ type StructJuMPModel <: ModelInterface
             
             for i=1:nvar
                 x0[i] = getvalue(Variable(mm,i))
-                isnan(x0[i])?x0[i]=1.0:nothing
+                isnan(x0[i]) ? x0[i]=1.0 : nothing
             end
             # @show x0;
         end  
@@ -823,30 +824,31 @@ end
 function structJuMPSolve(model; with_prof=false, suppress_warmings=false,kwargs...)
     # @show "solve"
     t_sj_lifetime = 0.0
-    @timing with_prof tic()
+    # @timing with_prof tic()
     
     # MPI.Init() ＃initialize in model loading
 
-    comm = getStructure(model).mpiWrapper.comm
+    comm = model.mpiWrapper.comm
     # @show "[$(MPI.Comm_rank(comm))/$(MPI.Comm_size(comm))] create problem "
     
     t_sj_model_init = 0.0
-    @timing with_prof tic()
+    # @timing with_prof tic()
 
-    prob = PipsNlpSolver.createProblemStruct(comm, StructJuMPModel(model,with_prof), with_prof)
+    # prob = PipsNlpSolver.createProblemStruct(comm, StructJuMPModel(model,with_prof), with_prof)
+    prob = createProblemStruct(comm, StructJuMPModel(model,with_prof), with_prof)
 
-    @timing with_prof t_sj_model_init += toq()
+    # @timing with_prof t_sj_model_init += toq()
 
     # @show "end createStructJuMPPipsNlpProblem"
 
     t_sj_solver_total = 0.0
-    @timing with_prof tic()
+    # @timing with_prof tic()
     
     status = PipsNlpSolver.solveProblemStruct(prob)
     
-    @timing with_prof t_sj_solver_total += toq()
+    # @timing with_prof t_sj_solver_total += toq()
     
-    @timing with_prof t_sj_lifetime += toq()
+    # @timing with_prof t_sj_lifetime += toq()
 
     # solver_time = solver_total - modeling_time
     # if(0==MPI.Comm_rank(MPI.COMM_WORLD)) 

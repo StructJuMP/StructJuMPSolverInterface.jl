@@ -2,10 +2,11 @@
 # Wrapper for the paralel/structured PIPS-NLP interface
 #
 
-module PipsNlpSolver  
+# module PipsNlpSolver  
 
 using StructJuMPSolverInterface
 import MPI
+import Libdl
 
 try
   sharedLib=ENV["PIPS_NLP_PAR_SHARED_LIB"]
@@ -17,12 +18,12 @@ try
   end  
   global const libparpipsnlp=Libdl.dlopen(get(ENV,"PIPS_NLP_PAR_SHARED_LIB",""))
 catch 
-  warn("Could not load PIPS-NLP shared library. Make sure the ENV variable 'PIPS_NLP_PAR_SHARED_LIB' points to its location, usually in the PIPS repo at PIPS/build_pips/PIPS-NLP/libparpipsnlp.so")
+  print("Could not load PIPS-NLP shared library. Make sure the ENV variable 'PIPS_NLP_PAR_SHARED_LIB' points to its location, usually in the PIPS repo at PIPS/build_pips/PIPS-NLP/libparpipsnlp.so")
   rethrow()
 end
 
 #######################
-type FakeModel <: ModelInterface
+struct FakeModel <: ModelInterface
     sense::Symbol
     status::Int
     nscen::Int
@@ -116,8 +117,8 @@ end
 #######################
 
 
-type PipsNlpProblemStruct
-    ref::Ptr{Void}
+struct PipsNlpProblemStruct
+    ref::Ptr{Cvoid}
     model::ModelInterface
     comm::MPI.Comm
     prof::Bool
@@ -150,8 +151,8 @@ type PipsNlpProblemStruct
     end
 end
 
-immutable CallBackData
-	prob::Ptr{Void}
+struct CallBackData
+	prob::Ptr{Cvoid}
 	row_node_id::Cint
     col_node_id::Cint
     flag::Cint  
@@ -537,11 +538,11 @@ function createProblemStruct(comm::MPI.Comm, model::ModelInterface, prof::Bool)
     # println(" callback created ")
     prob = PipsNlpProblemStruct(comm, model, prof)
     # @show prob
-    ret = ccall(Libdl.dlsym(libparpipsnlp,:CreatePipsNlpProblemStruct),Ptr{Void},
+    ret = ccall(Libdl.dlsym(libparpipsnlp,:CreatePipsNlpProblemStruct),Ptr{Cvoid},
             (MPI.Comm, 
-            Cint, Ptr{Void}, Ptr{Void}, 
-	    Ptr{Void}, Ptr{Void}, Ptr{Void}, 
-	    Ptr{Void}, Ptr{Void}, Ptr{Void},Any
+            Cint, Ptr{Cvoid}, Ptr{Cvoid}, 
+	    Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, 
+	    Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},Any
             ),
             comm, 
             model.get_num_scen(),
@@ -573,7 +574,7 @@ function solveProblemStruct(prob::PipsNlpProblemStruct)
     # @show prob
     
     ret = ccall(Libdl.dlsym(libparpipsnlp,:PipsNlpSolveStruct), Cint, 
-            (Ptr{Void},),
+            (Ptr{Cvoid},),
             prob.ref)
     # @show ret
     prob.model.set_status(Int(ret))
@@ -586,7 +587,7 @@ end
 function freeProblemStruct(prob::PipsNlpProblemStruct)
     # @show "freeProblemStruct"
     ret = ccall(Libdl.dlsym(libparpipsnlp,:FreePipsNlpProblemStruct),
-            Void, (Ptr{Void},),
+            Cvoid, (Ptr{Cvoid},),
             prob.ref)
     # @show ret
     return ret
@@ -622,7 +623,7 @@ function t_reset(prob::PipsNlpProblemStruct)
     return total
 end
 
-end
+# end
 
 
 
